@@ -1,0 +1,11 @@
+pandas
+plotly
+streamlit
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pyvis
+matplotlib
+numpy
+pyvis==0.3.2
+plotly==5.24.1
