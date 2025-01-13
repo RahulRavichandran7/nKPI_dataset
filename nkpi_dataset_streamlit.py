@@ -26,69 +26,164 @@ def main():
     page = st.sidebar.radio(
         "nKPI Dashboard",
         [
-           "Activity - Directory Teams",
-            "Office Hours Usage",
-            "Directory MAUs",
-            "Network Density",
-            "IRL Gatherings",
-            "Network Growth",
-            # "Hackathons",
-            "Usage Activity"
+            "Capital",
+            "Teams",
+            "Brand",
+            "Network Tooling",
+            "Knowledge",
+            "People/Talent",
+            "User/Customers",
+            "Programs",
+            "Projects",
+            "Service Providers",
+            "Other Networks"
         ]
     )
 
     engine = get_database_connection()
 
-    if page == "Activity - Directory Teams":
-        st.title("Activity -- Directory Teams")
+    if page == "Capital":
+        st.subheader("Capital Raised by PL Portfolio Venture Startups")
 
-        st.markdown("""Breakdown of user engagement and activity on Directory team profiles""")
-
-        
-
-
-    elif page == "Office Hours Usage":
-        st.title("Office Hours Usage")
-        
-        st.markdown("""
-            Breakdown of OH activity on Member and Team Profile
-        """)
-
-        
-
-    elif page == "Directory MAUs":
-        st.title("Directory MAUs")
-
-        df = fetch_average_session_time(engine)
-        avg_minutes = int(df['average_duration_minutes'][0])
-        avg_seconds = int(df['average_duration_seconds'][0])
-
-        # Display the results
-        # st.header("Session Duration Summary")
-        # st.metric("Average Session Duration", f"{avg_minutes} min {avg_seconds} sec")
-
-        st.markdown(
-            f"""
-            <div style="background-color:#FFD700; padding:20px; border-radius:8px; text-align:center;">
-                <h3>Average Session Duration</h3>
-                <p style="font-size:28px; font-weight:bold; color:#2b2b2b;">{avg_minutes} min {avg_seconds} sec</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    elif page == 'Network Density':
-        st.title("Network Density")
-
-    elif page == 'Network Strength - LongTerm Connectivity':
-        st.title("Network Strength - LongTerm Connectivity")
-
-    elif page == 'Network Strength - Conversation Based Connectivity':
-        st.title("Activity --  Network Strength - Conversation Based Connectivity")
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Capital+Raised+PL(nKPI).png"
+        st.image(dummy_image_url,  width=900)
        
-    elif page == 'IRL Gatherings':
-        st.title("IRL Gatherings")
+        st.subheader("Capital Raised by All Organizations in the Network")
 
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Capital+Raised+by+Org(nKPI).png"
+        st.image(dummy_image_url,  width=900)
 
+        st.subheader("Angel Investors of Network Teams")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Angel+Investors+of+Network(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("VC Investors of Network Teams")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/VC+Investors+of+Teams(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+    elif page == "Teams":
+        st.subheader("Shut down, Same stage and Moved up")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Shut+down%2C+moved+team(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+       
+        st.subheader("Teams by Membership Tier")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Teams+by+Membership(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Teams by Impact Tier")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Teams+by+Impact+Tier(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("% of Top Teams in each focus area that are engaged with Protocol Labs")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+        
+    elif page == "Brand":
+        st.subheader("Share of Voice")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/share+of+voice(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+       
+        st.subheader("Audience Growth")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Audience+Growth(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Engagement Rate")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Engagement+Rate(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Email Subscribers")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Email+Subscribers(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+    elif page == 'Network Tooling':
+        st.subheader("Monthly Active Users")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+       
+        st.subheader("Avg Session Duration")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Team Growth")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Member Growth") 
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Project Growth")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("NPS Feedback")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+    elif page == 'Knowledge':
+        st.subheader("Office Hours Held (By Type)")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+       
+        st.subheader("% Network Density")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Network+Density(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Monthly Active Users by Contribution Type - Events")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+        st.subheader("Monthly Active Teams by Contribution Type - Events")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
+        st.image(dummy_image_url,  width=900)
+
+    elif page == 'People/Talent':
+        st.subheader("# of Active Users in the Network")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/No.+Of+Avtive+Users+in+Network(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+         
+    elif page == 'User/Customers':
+        st.subheader("")
+
+    elif page == 'Programs':
+        st.subheader("Number of teams participating in programs, new vs. repeat")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/No+of+team+new+and+repeat(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+    
+    elif page == 'Projects':
+        st.subheader("Project Contributors by Month")
+
+        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Project+Cintributors(nKPI).png"
+        st.image(dummy_image_url,  width=900)
+
+    elif page == 'Service Providers':
+        st.subheader("")
+
+    elif page == 'Other Networks':
+        st.subheader("")
 if __name__ == "__main__":
     main()
+
+   
