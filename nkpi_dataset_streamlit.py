@@ -4,8 +4,8 @@ import streamlit as st
 from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
-import pandas as pd
-import plotly.express as px
+import gspread
+from google.oauth2.service_account import Credentials
 load_dotenv()
 
 @st.cache_resource
@@ -63,6 +63,98 @@ def fetch_session_durations():
     """
     return execute_query(query)
 
+def fetch_monthly_active_user():
+    query = """
+    WITH guest_sessions AS (
+    -- Find guest user sessions with session counts greater than 5  -2
+    SELECT
+        EXTRACT(YEAR FROM timestamp) AS year,
+        EXTRACT(MONTH FROM timestamp) AS month,
+        COUNT(properties->>'$session_id') AS session_count,
+        COALESCE(
+            properties->>'userName',
+            properties->>'loggedInUserName',
+            properties->'user'->>'name',
+            'guest_user'  -- Treat NULL users as 'guest_user'
+        ) AS user_name,
+        properties->>'$session_id' AS session_id  -- Track unique session
+    FROM 
+        public.posthogevents
+    WHERE
+        properties->>'$session_id' IS NOT NULL
+        AND (
+            COALESCE(
+                properties->>'userName', 
+                properties->>'loggedInUserName', 
+                properties->'user'->>'name'
+            ) IS NULL  -- Only for guest users
+            OR properties->>'userName' NOT IN ('La Christa Eccles', 'Winston Manuel Vijay A', 'Abarna Visvanathan', 'Winston Manuel Vijay')
+        )
+    GROUP BY
+        EXTRACT(YEAR FROM timestamp), 
+        EXTRACT(MONTH FROM timestamp),
+        properties->>'$session_id', 
+        COALESCE(
+            properties->>'userName',
+            properties->>'loggedInUserName',
+            properties->'user'->>'name',
+            'guest_user'  -- Treat NULL users as 'guest_user'
+        )
+    HAVING 
+        COUNT(properties->>'$session_id') > 5  -- Only include guest sessions with more than 5 occurrences -3
+    ),
+    active_users AS (
+        -- Find active users (non-guest users)
+        SELECT
+            EXTRACT(YEAR FROM timestamp) AS year,
+            EXTRACT(MONTH FROM timestamp) AS month,
+            COUNT(DISTINCT
+                COALESCE(
+                    properties->>'userName', 
+                    properties->>'loggedInUserName', 
+                    properties->'user'->>'name',
+                    'guest_user'
+                )
+            ) AS active_user_count
+        FROM 
+            public.posthogevents
+        WHERE
+            properties->>'$session_id' IS NOT NULL
+            AND (
+                COALESCE(
+                    properties->>'userName', 
+                    properties->>'loggedInUserName', 
+                    properties->'user'->>'name'
+                ) NOT IN ('La Christa Eccles', 'Winston Manuel Vijay A', 'Abarna Visvanathan', 'Winston Manuel Vijay')
+                OR properties->>'userName' IS NULL
+            )
+        GROUP BY
+            EXTRACT(YEAR FROM timestamp), 
+            EXTRACT(MONTH FROM timestamp)
+    )
+
+    -- Now combine both guest_sessions and active_users
+    SELECT
+        gs.year,
+        gs.month,
+        COUNT(DISTINCT gs.session_id) AS guest_user_count,  -- Count unique guest user sessions
+        au.active_user_count
+    FROM
+        guest_sessions gs
+    JOIN
+        active_users au
+    ON
+        gs.year = au.year
+        AND gs.month = au.month
+    GROUP BY
+        gs.year,
+        gs.month,
+        au.active_user_count
+    ORDER BY 
+        gs.year, gs.month;
+    """
+    return execute_query(query)
+
 def fetch_project_data():
     query = """
     SELECT
@@ -84,8 +176,7 @@ def fetch_project_data():
     ORDER BY 
         MIN(p."createdAt");
     """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 def fetch_team_data():
     query = """
@@ -106,8 +197,7 @@ def fetch_team_data():
     ORDER BY 
         MIN(p."createdAt");
     """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 def fetch_member_data():
     query = """
@@ -128,8 +218,7 @@ def fetch_member_data():
     ORDER BY 
         MIN(p."createdAt");
     """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 
 def fetch_OH_data():
@@ -176,8 +265,7 @@ def fetch_OH_data():
             ORDER BY 
                 month_year;
             """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 
 
@@ -203,8 +291,7 @@ def fetch_event_participation_member_data():
         ORDER BY 
             pe."startDate"::date DESC;
         """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 
 def fetch_event_participation_team_data():
@@ -229,8 +316,7 @@ def fetch_event_participation_team_data():
     ORDER BY 
         pe."startDate"::date DESC; 
         """
-    engine = get_database_connection()
-    return pd.read_sql(query, engine)
+    return execute_query(query)
 
 
 
@@ -255,99 +341,515 @@ def main():
         ]
     )
 
-    engine = get_database_connection()
+    scopes = [
+          
+                "https://www.googleapis.com/auth/spreadsheets"
+            ]
+    client_email = os.getenv("GOOGLE_SHEET_CLIENT_EMAIL")
+    private_key = os.getenv("GOOGLE_SHEET_PRIVATE_KEY").replace('\\n', '\n')  # Handle multiline key format
+    project_id = os.getenv("GOOGLE_SHEET_PROJECT_ID")
+    credentials = Credentials.from_service_account_info(
+        {
+            "type": "service_account",
+            "project_id": project_id,
+            "private_key_id": os.getenv("GOOGLE_SHEET_PRIVATE_KEY_ID"),
+            "private_key": private_key,
+            "client_email": client_email,
+            "client_id": os.getenv("GOOGLE_SHEET_CLIENT_ID"),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": os.getenv("GOOGLE_SHEET_CLIENT_X509_CERT_URL")
+        },
+            scopes=scopes
+    )
+    client = gspread.authorize(credentials)
+    sheet_url = os.getenv("GOOGLE_SHEET_SPREADSHEET_URL")
+    sheet = client.open_by_url(sheet_url)
 
     if page == "Capital":
-        st.subheader("Capital Raised by PL Portfolio Venture Startups")
+        try:
+            worksheet = sheet.get_worksheet(1)
+            ranges = ['D1:E8', 'I1:J8', 'N1:O8', 'S1:T8']
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Capital+Raised+PL(nKPI).png"
-        st.image(dummy_image_url,  width=900)
-       
-        st.subheader("Capital Raised by All Organizations in the Network")
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Capital+Raised+by+Org(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Amount"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')                 
 
-        st.subheader("Angel Investors of Network Teams")
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Angel+Investors+of+Network(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+                bar2 = px.bar(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Amount"},
+                    height=500  
+                )
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')
 
-        st.subheader("VC Investors of Network Teams")
+            data_range3 = ranges[2]
+            data3 = worksheet.get_values(data_range3)
+            if data3 and len(data3[0]) >= 2:
+                df3 = pd.DataFrame(data3[1:], columns=data3[0])
+                df3.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df3.dropna(subset=["Month-Year", "Value"], inplace=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/VC+Investors+of+Teams(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+                bar3 = px.bar(
+                    df3,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Investors"},
+                    height=500  
+                )
+                bar3.update_traces(texttemplate='%{text}', textposition='outside') 
+
+            data_range4 = ranges[3]
+            data4 = worksheet.get_values(data_range4)
+            if data4 and len(data4[0]) >= 2:
+                df4 = pd.DataFrame(data4[1:], columns=data4[0])
+                df4.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df4.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                bar4 = px.bar(
+                    df4,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Investors"},
+                    height=500 
+                )
+                bar4.update_traces(texttemplate='%{text}', textposition='outside')  
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Capital Raised by PL Portfolio Venture Startups")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Capital Raised by All Organizations in the Network")
+                st.plotly_chart(bar2)
+
+            col3, col4 = st.columns(2)
+
+            with col3:
+                st.subheader("Angel Investors of Network Teams")
+                st.plotly_chart(bar3)
+            
+            with col4:
+                st.subheader("VC Investors of Network Teams")
+                st.plotly_chart(bar4)
+
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
     elif page == "Teams":
-        st.subheader("Shut down, Same stage and Moved up")
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Shut+down%2C+moved+team(nKPI).png"
-        st.image(dummy_image_url,  width=900)
-       
-        st.subheader("Teams by Membership Tier")
+        try:
+            worksheet = sheet.get_worksheet(2)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Teams+by+Membership(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            ranges = ['D1:G9', 'K1:N8']
+            data_range_stage = "V3:X13" 
 
-        st.subheader("Teams by Impact Tier")
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Teams+by+Impact+Tier(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                if "Month Year" in df1.columns:
+                    df1.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
 
-        st.subheader("% of Top Teams in each focus area that are engaged with Protocol Labs")
+                df1.dropna(subset=["Month-Year"], inplace=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
-        st.image(dummy_image_url,  width=900)
+                df1["Month-Year"] = pd.to_datetime(df1["Month-Year"], errors="coerce")
+
+                df1["Month-Year"] = df1["Month-Year"].dt.strftime('%b %Y')
+
+                df1.sort_values(by="Month-Year", inplace=True)
+
+                df1_long = df1.melt(
+                    id_vars="Month-Year",  
+                    value_vars=[col for col in df1.columns if col != "Month-Year"], 
+                    var_name="Type", 
+                    value_name="Value"
+                )
+
+                df1_long = df1_long[df1_long["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    color="Type", 
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Teams"},
+                    height=500,
+                    barmode="stack" 
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside') 
+
+                bar1.update_layout(
+                    xaxis_tickformat="%b %Y", 
+                    xaxis_tickangle=360,
+                )
+
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+
+                if "Month Year" in df2.columns:
+                    df2.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+
+                df2.dropna(subset=["Month-Year"], inplace=True)
+                df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")        
+                df2.sort_values("Month-Year", inplace=True)
+
+                df2_long = df2.melt(
+                    id_vars="Month-Year",
+                    value_vars=[col for col in df2.columns if col != "Month-Year"],
+                    var_name="Type",
+                    value_name="Value"
+                )
+
+                df2_long = df2_long[df2_long["Value"] > 0]
+
+                bar2 = px.bar(
+                    df2_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    color="Type",
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Teams"},
+                    height=500,
+                    barmode="stack"
+                )
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')
+                bar2.update_layout(
+                    xaxis=dict(
+                        tickformat="%b %Y",  
+                        type="date",  
+                        tickmode="auto",  
+                    )                )
+                
+                bar2.update_xaxes(
+                    tickformat="%b %Y", 
+                    title_text="Year-Month",
+                    tickmode="linear",   
+                    dtick="M1",         
+                )
+
+
+            data = worksheet.get_values(data_range_stage)
+            if data and len(data) > 1:
+                df3 = pd.DataFrame(data, columns=["Stage", "Q4 2024", "Q2 2024"])
+
+                df3["Q4 2024"] = pd.to_numeric(df3["Q4 2024"], errors='coerce')
+                df3["Q2 2024"] = pd.to_numeric(df3["Q2 2024"], errors='coerce')
+
+                df3_long = df3.melt(
+                    id_vars=["Stage"], 
+                    value_vars=["Q4 2024", "Q2 2024"],
+                    var_name="Quarter", 
+                    value_name="Count"
+                )
+
+                bar3 = px.bar(
+                    df3_long,
+                    x="Stage",
+                    y="Count",
+                    text="Count",
+                    color="Quarter",  
+                    labels={"Stage": "Stage", "Count": "No. Of Teams"},
+                    barmode="stack",  
+                    height=500
+                )
+                bar3.update_traces(texttemplate='%{text}', textposition='outside')  
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Shut down, Same stage, and Moved up")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Teams by Membership Tier")
+                st.plotly_chart(bar2)
+
+            col3, col4 = st.columns(2)
+
+            with col3:
+                st.subheader("Teams by Impact Tier")
+                st.plotly_chart(bar3)
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
         
     elif page == "Brand":
-        st.subheader("Share of Voice")
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/share+of+voice(nKPI).png"
-        st.image(dummy_image_url,  width=900)
-       
-        st.subheader("Audience Growth")
+        try:
+            worksheet = sheet.get_worksheet(3)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Audience+Growth(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            ranges = ['N1:O9', 'I1:J9', 'S1:T9']
 
-        st.subheader("Engagement Rate")
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Engagement+Rate(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
 
-        st.subheader("Email Subscribers")
+                if "Month Year" in df1.columns:
+                    df1.rename(columns={"Month Year": "Month-Year"}, inplace=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Email+Subscribers(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+                if "Data" in df1.columns:
+                    df1["Data"] = df1["Data"].apply(lambda x: float(x.replace('%', '').strip()) / 100 if isinstance(x, str) else x)
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+
+                df1.dropna(subset=["Month-Year"], inplace=True)
+
+                df1["Month-Year"] = pd.to_datetime(df1["Month-Year"], errors="coerce")
+
+                df1.sort_values(by="Month-Year", inplace=True)
+
+                df1["Month-Year"] = df1["Month-Year"].dt.strftime('%b %Y')
+
+                df1_long = df1.melt(
+                    id_vars="Month-Year",  
+                    value_vars=[col for col in df1.columns if col != "Month-Year"],
+                    var_name="Type", 
+                    value_name="Value"
+                )
+
+                df1_long = df1_long[df1_long["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Engagement Rate"},
+                    height=500,
+                    barmode="stack" 
+                )
+
+                bar1.update_traces(
+                    texttemplate='%{y:.2%}',  
+                    textposition='outside'
+                )
+
+                bar1.update_layout(
+                    xaxis_tickformat="%b %Y", 
+                    xaxis_tickangle=360,  
+                    yaxis_tickformat='.0%',  
+                )
+
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+
+                if "Month Year" in df2.columns:
+                    df2.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
+                if "Count" in df2.columns:
+                    df2["Count"] = df2["Count"].apply(lambda x: int(x.replace(',', '').strip()) if isinstance(x, str) else x)
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+
+                df2.dropna(subset=["Month-Year"], inplace=True)
+
+                df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")
+
+                df2.sort_values(by="Month-Year", inplace=True)
+
+                df2_long = df2.melt(
+                    id_vars="Month-Year",  
+                    value_vars=[col for col in df2.columns if col != "Month-Year"],  
+                    var_name="Type", 
+                    value_name="Value"
+                )
+
+                df2_long = df2_long[df2_long["Value"] > 0]
+
+                df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')  
+
+                bar2 = px.bar(
+                    df2_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Audience"},
+                    height=500,
+                    barmode="stack"  
+                )
+
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')  
+
+                bar2.update_layout(
+                    xaxis_tickformat="%b %Y",  
+                    xaxis_tickangle=360,
+                )
+
+            data_range3 = ranges[2]
+            data3 = worksheet.get_values(data_range3)
+
+            if data3 and len(data3[0]) >= 2:
+                df3 = pd.DataFrame(data3[1:], columns=data3[0])
+
+                if "Month Year" in df3.columns:
+                    df3.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
+                if "Data" in df3.columns:
+                    df3["Data"] = pd.to_numeric(df3["Data"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df3.columns:
+                    if col != "Month-Year":
+                        df3[col] = pd.to_numeric(df3[col], errors='coerce')
+
+                df3.dropna(subset=["Month-Year", "Data"], inplace=True)
+
+                df3["Month-Year"] = pd.to_datetime(df3["Month-Year"], errors="coerce")
+
+                df3.sort_values(by="Month-Year", inplace=True)
+
+                df3["Month-Year"] = df3["Month-Year"].dt.strftime('%b %Y')
+
+                df3_long = df3.melt(
+                    id_vars="Month-Year",  
+                    value_vars=[col for col in df3.columns if col != "Month-Year"],  
+                    var_name="Type", 
+                    value_name="Value"
+                )
+
+                df3_long = df3_long[df3_long["Value"] > 0]
+
+                bar3 = px.bar(
+                    df3_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. Of Subscribers"},
+                    height=500,
+                    barmode="stack" 
+                )
+
+                bar3.update_traces(texttemplate='%{text}', textposition='outside')
+
+                bar3.update_layout(
+                    xaxis_tickformat="%b %Y",  
+                    xaxis_tickangle=360                )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Engagement Rate")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Audience Growth")
+                st.plotly_chart(bar2)
+
+            col3, col4 = st.columns(2)
+
+            with col3:
+                st.subheader("Email Subscribers")
+                st.plotly_chart(bar3)
+
+            with col4:
+                st.subheader("Share of Voice")
+                dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/share+of+voice(nKPI).png"
+                st.image(dummy_image_url,  width=900)
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
     elif page == 'Network Tooling':
-        st.subheader("Monthly Active Users")
+        st.subheader("Monthly User Activity")
+        df = fetch_monthly_active_user()
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
-        st.image(dummy_image_url,  width=900)
+        df['month'] = df['month'].astype(int)  
+        df['year'] = df['year'].astype(int)    
+
+        df['Month-Year'] = df.apply(lambda row: pd.to_datetime(f"{row['month']}-01-{row['year']}", format="%m-%d-%Y").strftime("%b %Y"), axis=1)
+
+        df_long = df.melt(id_vars=['Month-Year'], value_vars=['guest_user_count', 'active_user_count'],
+                        var_name='Type', value_name='user_count')
+
+        df_long['Type'] = df_long['Type'].map({
+            'guest_user_count': 'Visitor',
+            'active_user_count': 'Logged-In'        })
+
+        fig = px.bar(
+            df_long,
+            x='Month-Year',
+            y='user_count',
+            color='Type',
+            labels={'Month-Year': 'Month-Year', 'user_count': 'User Count'},
+            color_discrete_map={'Visitor': 'blue', 'Logged-In': 'orange'},
+            barmode='stack',
+        )
+
+        fig.update_traces(texttemplate='%{y}', textposition='outside')
+
+        fig.update_layout(
+            xaxis_tickmode='array',
+            xaxis_tickvals=df['Month-Year'].unique(),
+            xaxis_ticktext=df['Month-Year'].unique(),
+            xaxis_tickangle=360 
+        )
+
+        st.plotly_chart(fig)
        
         st.subheader("Avg Session Duration")
-
-        # dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Coming+Soon.png"
-        # st.image(dummy_image_url,  width=900)
 
         session_data = fetch_session_durations()
 
         if not session_data.empty:
-            # Combine minutes and seconds into a single value
             session_data["average_duration_combined"] = (
                 session_data["average_duration_minutes"] + session_data["average_duration_seconds"] / 60
             )
 
-            # Convert year and month into a proper datetime column for easier handling
             session_data["year_month"] = pd.to_datetime(session_data[["year", "month"]].assign(day=1))
 
-            # Create an interactive Plotly line chart
             fig = px.line(
                 session_data,
                 x="year_month",
                 y="average_duration_combined",
-                # title="Monthly Average Session Duration",
                 labels={
                     "year_month": "Year-Month",
                     "average_duration_combined": "Avg Duration (minutes.seconds)"
@@ -355,13 +857,13 @@ def main():
                 markers=True
             )
 
-            # Format the x-axis to show 'Jan 2024' style labels
             fig.update_xaxes(
-                tickformat="%b %Y",  # Display as 'Jan 2024'
-                title_text="Year-Month"
+                tickformat="%b %Y", 
+                title_text="Year-Month",
+                tickmode="linear",   
+                dtick="M1",        
             )
 
-            # Display the chart in Streamlit
             st.plotly_chart(fig, use_container_width=True)
 
         else:
@@ -372,13 +874,12 @@ def main():
         df = fetch_team_data()
 
         df_long = df.melt(
-            id_vars=["month_year"],  # Columns to keep as is
-            value_vars=["new_entries", "existing_entries", "total_entries"],  # Columns to unpivot
-            var_name="type",  # New column name for variable names
-            value_name="count"  # New column name for values
+            id_vars=["month_year"],  
+            value_vars=["new_entries", "existing_entries", "total_entries"], 
+            var_name="type",  
+            value_name="count" 
         )
 
-        # Rename the values in the 'type' column for better readability
         type_mapping = {
             "new_entries": "New Entries",
             "existing_entries": "Existing Entries",
@@ -386,26 +887,23 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        # Plot the stacked bar chart
         fig = px.bar(
             df_long, 
-            x="month_year",  # X-axis is 'month_year'
-            y="count",  # Y-axis is the count column
-            color="type",  # Color by the 'type' column
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"},  # Updated labels
-            text_auto=True  # Display the count on top of the bars
+            x="month_year", 
+            y="count",  
+            color="type", 
+            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"}, 
+            text_auto=True  
         )
 
-        # Customize layout for better presentation
         fig.update_layout(
-            barmode="stack",  # Stack the bars
+            barmode="stack", 
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
-            legend_title="Entry Type",  # Update legend title
+            legend_title="Entry Type",  
             showlegend=True
         )
 
-        # Display the plot in Streamlit
         st.plotly_chart(fig)
 
         st.subheader("Member Growth") 
@@ -413,13 +911,12 @@ def main():
         df = fetch_member_data()
 
         df_long = df.melt(
-            id_vars=["month_year"],  # Columns to keep as is
-            value_vars=["new_entries", "existing_entries", "total_entries"],  # Columns to unpivot
-            var_name="type",  # New column name for variable names
-            value_name="count"  # New column name for values
+            id_vars=["month_year"],  
+            value_vars=["new_entries", "existing_entries", "total_entries"], 
+            var_name="type", 
+            value_name="count"  
         )
 
-        # Rename the values in the 'type' column for better readability
         type_mapping = {
             "new_entries": "New Entries",
             "existing_entries": "Existing Entries",
@@ -427,26 +924,23 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        # Plot the stacked bar chart
         fig = px.bar(
             df_long, 
-            x="month_year",  # X-axis is 'month_year'
-            y="count",  # Y-axis is the count column
-            color="type",  # Color by the 'type' column
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"},  # Updated labels
-            text_auto=True  # Display the count on top of the bars
+            x="month_year",  
+            y="count", 
+            color="type",  
+            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"},  
+            text_auto=True  
         )
 
-        # Customize layout for better presentation
         fig.update_layout(
-            barmode="stack",  # Stack the bars
+            barmode="stack",  
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
-            legend_title="Entry Type",  # Update legend title
+            legend_title="Entry Type",  
             showlegend=True
         )
 
-        # Display the plot in Streamlit
         st.plotly_chart(fig)
 
         st.subheader("Project Growth")
@@ -454,13 +948,12 @@ def main():
         df = fetch_project_data()
 
         df_long = df.melt(
-            id_vars=["month_year"],  # Columns to keep as is
-            value_vars=["new_entries", "existing_entries", "total_entries"],  # Columns to unpivot
-            var_name="type",  # New column name for variable names
-            value_name="count"  # New column name for values
+            id_vars=["month_year"],  
+            value_vars=["new_entries", "existing_entries", "total_entries"], 
+            var_name="type", 
+            value_name="count"  
         )
 
-        # Rename the values in the 'type' column for better readability
         type_mapping = {
             "new_entries": "New Entries",
             "existing_entries": "Existing Entries",
@@ -468,26 +961,23 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        # Plot the stacked bar chart
         fig = px.bar(
             df_long, 
-            x="month_year",  # X-axis is 'month_year'
-            y="count",  # Y-axis is the count column
-            color="type",  # Color by the 'type' column
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"},  # Updated labels
-            text_auto=True  # Display the count on top of the bars
+            x="month_year",
+            y="count", 
+            color="type",  
+            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"}, 
+            text_auto=True 
         )
 
-        # Customize layout for better presentation
         fig.update_layout(
-            barmode="stack",  # Stack the bars
+            barmode="stack",  
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
-            legend_title="Entry Type",  # Update legend title
+            legend_title="Entry Type",  
             showlegend=True
         )
 
-        # Display the plot in Streamlit
         st.plotly_chart(fig)
 
         st.subheader("NPS Feedback")
@@ -501,24 +991,84 @@ def main():
         df = fetch_OH_data()
 
         if not df.empty:
-            df_pivot = df.pivot_table(index="month_year", columns="page_type", values="interaction_count", aggfunc="sum").fillna(0)
+            df['month_year'] = pd.to_datetime(df['month_year'], format='%Y-%m')
+
+            all_months = pd.date_range(df['month_year'].min(), df['month_year'].max(), freq='MS')
+
+            df_full = pd.DataFrame(all_months, columns=['month_year'])
+            df_full['month_year'] = pd.to_datetime(df_full['month_year'])
+
+            df_merged = pd.merge(df_full, df, on='month_year', how='left').fillna({'interaction_count': 0})
+
+            df_merged['month_year'] = df_merged['month_year'].dt.strftime('%b %Y')
+
+            df_merged['month_year'] = pd.to_datetime(df_merged['month_year'], format='%b %Y')
+            df_merged = df_merged.sort_values('month_year')
+
+            df_pivot = df_merged.pivot_table(index="month_year", columns="page_type", values="interaction_count", aggfunc="sum").fillna(0)
+
+            df_pivot.index = df_pivot.index.strftime('%b %Y')
 
             fig = px.bar(df_pivot,
                         x=df_pivot.index,  
                         y=df_pivot.columns,  
-                        labels={"value": "Interaction Count", "month_year": "Month-Year", "page_type":"Page Type"},
+                        labels={"value": "Interaction Count", "month_year": "Month-Year", "page_type": "Page Type"},
                         height=400)
 
-            fig.update_layout(barmode='stack', xaxis_tickangle=-45)
+            fig.update_layout(
+                barmode='stack',
+                xaxis_tickangle=360,  
+                xaxis={'tickmode': 'array', 'tickvals': df_pivot.index}
+            )
+
             st.plotly_chart(fig)
 
         else:
             st.warning("No data available to display.")
-       
-        st.subheader("% Network Density")
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Network+Density(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+        try:
+            worksheet = sheet.get_worksheet(5)
+
+            data_range_stage = "T1:V5"
+            data = worksheet.get_values(data_range_stage)
+            df3 = pd.DataFrame(data, columns=["Month Year", "Network Density by Member", "Network Density by Team"])
+
+            df3["Network Density by Member"] = pd.to_numeric(df3["Network Density by Member"].replace('%', '', regex=True), errors='coerce')
+            df3["Network Density by Team"] = pd.to_numeric(df3["Network Density by Team"].replace('%', '', regex=True), errors='coerce')
+
+            df3 = df3.dropna(subset=["Network Density by Member", "Network Density by Team"])
+
+            df3_long = df3.melt(
+                id_vars=["Month Year"], 
+                value_vars=["Network Density by Member", "Network Density by Team"],
+                var_name="Type", 
+                value_name="Count"
+            )
+
+            df3_long['Count'] = df3_long['Count'] / 100  
+
+            bar3 = px.bar(
+                df3_long,
+                x="Month Year",
+                y="Count",
+                text="Count",
+                color="Type", 
+                labels={"Month Year": "Month Year", "Count": "% Network Density"},
+                barmode="stack",  
+                height=500
+            )
+
+            bar3.update_traces(texttemplate='%{text:.2%}', textposition='outside')
+
+            bar3.update_layout(
+                yaxis_tickformat='.0%', 
+                xaxis_tickangle=360,  
+            )
+
+            st.subheader("% Network Density")
+            st.plotly_chart(bar3)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
         st.subheader("Monthly Active Users by Contribution Type - Events")
 
@@ -527,45 +1077,62 @@ def main():
         if not df.empty:
             df['event_date'] = pd.to_datetime(df['event_date'], errors='coerce')
             df['month_year'] = df['event_date'].dt.to_period('M').astype(str)
-
+            
             column_mapping = {
                 "host_count": "Host Count",
                 "speaker_count": "Speaker Count",
                 "attendee_count": "Attendee Count"
             }
             df = df.rename(columns=column_mapping)
+            
+            df_pivot = df.pivot_table(
+                index="month_year", 
+                values=["Host Count", "Speaker Count", "Attendee Count"], 
+                aggfunc="sum"
+            ).fillna(0)
+            
+            df_pivot = df_pivot.reset_index()
+            
+            df_pivot = df_pivot[
+                (df_pivot[['Host Count', 'Speaker Count', 'Attendee Count']].sum(axis=1) > 0)
+            ]
+            
+            if df_pivot.empty:
+                st.write("No data available for the selected period.")
+            else:
+                df_long = df_pivot.melt(
+                    id_vars="month_year",  
+                    value_vars=["Host Count", "Speaker Count", "Attendee Count"], 
+                    var_name="Type", 
+                    value_name="Count"  
+                )
+                
+                df_long = df_long[df_long['Count'] > 0]
+                
+                fig = px.bar(
+                    df_long,
+                    x="month_year",  
+                    y="Count",  
+                    color="Type",  
+                    labels={"Count": "Member Count", "month_year": "Month-Year", "Type": "Participant Type"},
+                    height=400
+                )
+                
+                fig.update_layout(
+                    barmode='stack',  
+                    xaxis_tickangle=360,  
+                    legend_title="Type"
+                )
 
-            df_pivot = df.pivot_table(index="month_year", 
-                                    values=["Host Count", "Speaker Count", "Attendee Count"], 
-                                    aggfunc="sum").fillna(0)
+                fig.update_xaxes(
+                    tickformat="%b %Y", 
+                    title_text="Year-Month",
+                    tickmode="linear",   
+                    dtick="M1",         
+                )
 
-            df_pivot = df_pivot.reset_index()  
-            df_long = df_pivot.melt(
-                id_vars="month_year",  
-                value_vars=["Host Count", "Speaker Count", "Attendee Count"], 
-                var_name="Type", 
-                value_name="Count"  
-            )
-
-            fig = px.bar(
-                df_long,
-                x="month_year",  
-                y="Count",  
-                color="Type",  
-                labels={"Count": "Member Count", "month_year": "Month-Year", "Type": "Participant Type"},
-                height=400
-            )
-
-            fig.update_layout(
-                barmode='stack',  
-                xaxis_tickangle=-45,  
-                legend_title="Type"  
-            )
-
-            st.plotly_chart(fig)
-
-        else:
-            st.warning("No data available to display.")
+                
+                st.plotly_chart(fig)
 
         st.subheader("Monthly Active Teams by Contribution Type - Events")
 
@@ -573,7 +1140,6 @@ def main():
 
         if not df.empty:
             df['event_date'] = pd.to_datetime(df['event_date'], errors='coerce')
-
             df['month_year'] = df['event_date'].dt.to_period('M').astype(str)
 
             column_mapping = {
@@ -583,16 +1149,21 @@ def main():
             }
             df = df.rename(columns=column_mapping)
 
-            df_pivot = df.pivot_table(index="month_year", 
-                                    values=["Host Count", "Speaker Count", "Attendee Count"], 
-                                    aggfunc="sum").fillna(0)
+            df_pivot = df.pivot_table(
+                index="month_year", 
+                values=["Host Count", "Speaker Count", "Attendee Count"], 
+                aggfunc="sum"
+            ).fillna(0)
 
-            df_pivot = df_pivot.reset_index()  
+            df_pivot = df_pivot.reset_index()
+            months_to_remove = ["2024-01", "2024-02", "2024-03", "2024-10"]
+            df_pivot = df_pivot[~df_pivot['month_year'].isin(months_to_remove)]
+
             df_long = df_pivot.melt(
                 id_vars="month_year",  
                 value_vars=["Host Count", "Speaker Count", "Attendee Count"], 
                 var_name="Type",
-                value_name="Count"  
+                value_name="Count"
             )
 
             fig = px.bar(
@@ -606,12 +1177,18 @@ def main():
 
             fig.update_layout(
                 barmode='stack',  
-                xaxis_tickangle=-45, 
-                legend_title="Type"  
+                xaxis_tickangle=360, 
+                legend_title="Type"
             )
 
-            st.plotly_chart(fig)
+            fig.update_xaxes(
+                    tickformat="%b %Y", 
+                    title_text="Year-Month",
+                    tickmode="linear",   
+                    dtick="M1",         
+                )
 
+            st.plotly_chart(fig)
         else:
             st.warning("No data available to display.")
 

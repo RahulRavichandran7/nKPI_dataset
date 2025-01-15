@@ -9,3 +9,7 @@ matplotlib
 numpy
 pyvis==0.3.2
 plotly==5.24.1
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
