@@ -319,6 +319,36 @@ def fetch_event_participation_team_data():
     return execute_query(query)
 
 
+def process_and_plot(data_range, worksheet, x_col, y_col, y_label):
+    """
+    Processes data from a given range, creates a DataFrame, and plots a bar chart.
+
+    Args:
+        data_range (str): The range of cells to extract data from.
+        worksheet: The worksheet object.
+        x_col (str): The column to use for the X-axis.
+        y_col (str): The column to use for the Y-axis.
+        y_label (str): Label for the Y-axis.
+    Returns:
+        Plotly Figure: The generated bar chart.
+    """
+    data = worksheet.get_values(data_range)
+    if data and len(data[0]) >= 2:
+        df = pd.DataFrame(data[1:], columns=data[0])
+        df.rename(columns={"Month Year": "Month-Year", "Data": y_col}, inplace=True)
+        df.dropna(subset=["Month-Year", y_col], inplace=True)
+
+        bar = px.bar(
+            df,
+            x=x_col,
+            y=y_col,
+            text=y_col,
+            labels={x_col: "Month-Year", y_col: y_label},
+            height=500
+        )
+        bar.update_traces(texttemplate='%{text}', textposition='outside')
+        return bar
+    return None
 
 
 def main():
@@ -346,7 +376,7 @@ def main():
                 "https://www.googleapis.com/auth/spreadsheets"
             ]
     client_email = os.getenv("GOOGLE_SHEET_CLIENT_EMAIL")
-    private_key = os.getenv("GOOGLE_SHEET_PRIVATE_KEY").replace('\\n', '\n')  # Handle multiline key format
+    private_key = os.getenv("GOOGLE_SHEET_PRIVATE_KEY").replace('\\n', '\n')
     project_id = os.getenv("GOOGLE_SHEET_PROJECT_ID")
     credentials = Credentials.from_service_account_info(
         {
@@ -372,94 +402,28 @@ def main():
             worksheet = sheet.get_worksheet(1)
             ranges = ['D1:E8', 'I1:J8', 'N1:O8', 'S1:T8']
 
-            data_range1 = ranges[0]
-            data1 = worksheet.get_values(data_range1)
-            if data1 and len(data1[0]) >= 2:
-                df1 = pd.DataFrame(data1[1:], columns=data1[0])
-                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                bar1 = px.bar(
-                    df1,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "Amount"},
-                    height=500  
-                )
-                bar1.update_traces(texttemplate='%{text}', textposition='outside')                 
-
-            data_range2 = ranges[1]
-            data2 = worksheet.get_values(data_range2)
-            if data2 and len(data2[0]) >= 2:
-                df2 = pd.DataFrame(data2[1:], columns=data2[0])
-                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                bar2 = px.bar(
-                    df2,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "Amount"},
-                    height=500  
-                )
-                bar2.update_traces(texttemplate='%{text}', textposition='outside')
-
-            data_range3 = ranges[2]
-            data3 = worksheet.get_values(data_range3)
-            if data3 and len(data3[0]) >= 2:
-                df3 = pd.DataFrame(data3[1:], columns=data3[0])
-                df3.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df3.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                bar3 = px.bar(
-                    df3,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "No. Of Investors"},
-                    height=500  
-                )
-                bar3.update_traces(texttemplate='%{text}', textposition='outside') 
-
-            data_range4 = ranges[3]
-            data4 = worksheet.get_values(data_range4)
-            if data4 and len(data4[0]) >= 2:
-                df4 = pd.DataFrame(data4[1:], columns=data4[0])
-                df4.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df4.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                bar4 = px.bar(
-                    df4,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "No. Of Investors"},
-                    height=500 
-                )
-                bar4.update_traces(texttemplate='%{text}', textposition='outside')  
+            bar1 = process_and_plot(ranges[0], worksheet, "Month-Year", "Value", "Amount")
+            bar2 = process_and_plot(ranges[1], worksheet, "Month-Year", "Value", "Amount")
+            bar3 = process_and_plot(ranges[2], worksheet, "Month-Year", "Value", "No. Of Investors")
+            bar4 = process_and_plot(ranges[3], worksheet, "Month-Year", "Value", "No. Of Investors")
 
             col1, col2 = st.columns(2)
-
             with col1:
                 st.subheader("Capital Raised by PL Portfolio Venture Startups")
-                st.plotly_chart(bar1)
+                if bar1: st.plotly_chart(bar1)
 
             with col2:
                 st.subheader("Capital Raised by All Organizations in the Network")
-                st.plotly_chart(bar2)
+                if bar2: st.plotly_chart(bar2)
 
             col3, col4 = st.columns(2)
-
             with col3:
                 st.subheader("Angel Investors of Network Teams")
-                st.plotly_chart(bar3)
-            
+                if bar3: st.plotly_chart(bar3)
+
             with col4:
                 st.subheader("VC Investors of Network Teams")
-                st.plotly_chart(bar4)
-
+                if bar4: st.plotly_chart(bar4)
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
@@ -469,8 +433,7 @@ def main():
         try:
             worksheet = sheet.get_worksheet(2)
 
-            ranges = ['D1:G9', 'K1:N8']
-            data_range_stage = "V3:X13" 
+            ranges = ['D1:G20', 'K1:N20', 'V3:X13']
 
             data_range1 = ranges[0]
             data1 = worksheet.get_values(data_range1)
@@ -569,7 +532,7 @@ def main():
                 )
 
 
-            data = worksheet.get_values(data_range_stage)
+            data = worksheet.get_values(ranges[2])
             if data and len(data) > 1:
                 df3 = pd.DataFrame(data, columns=["Stage", "Q4 2024", "Q2 2024"])
 
@@ -583,6 +546,8 @@ def main():
                     value_name="Count"
                 )
 
+                df3_long = df3_long[df3_long["Count"] > 0]
+
                 bar3 = px.bar(
                     df3_long,
                     x="Stage",
@@ -590,10 +555,11 @@ def main():
                     text="Count",
                     color="Quarter",  
                     labels={"Stage": "Stage", "Count": "No. Of Teams"},
-                    barmode="stack",  
+                    barmode="group",  
                     height=500
                 )
-                bar3.update_traces(texttemplate='%{text}', textposition='outside')  
+                
+                bar3.update_traces(texttemplate='%{text}', textposition='outside')
 
             col1, col2 = st.columns(2)
 
@@ -619,8 +585,7 @@ def main():
         try:
             worksheet = sheet.get_worksheet(3)
 
-            ranges = ['N1:O9', 'I1:J9', 'S1:T9']
-
+            ranges = ['N1:O20', 'I1:J20', 'S1:T20']
             data_range1 = ranges[0]
             data1 = worksheet.get_values(data_range1)
 
@@ -636,6 +601,8 @@ def main():
                 for col in df1.columns:
                     if col != "Month-Year":
                         df1[col] = pd.to_numeric(df1[col], errors='coerce')
+
+                df1 = df1[df1["Data"] > 0]
 
                 df1.dropna(subset=["Month-Year"], inplace=True)
 
@@ -799,7 +766,6 @@ def main():
             st.error(f"An error occurred: {e}")
 
     elif page == 'Network Tooling':
-        st.subheader("Monthly User Activity")
         df = fetch_monthly_active_user()
 
         df['month'] = df['month'].astype(int)  
@@ -830,12 +796,8 @@ def main():
             xaxis_tickmode='array',
             xaxis_tickvals=df['Month-Year'].unique(),
             xaxis_ticktext=df['Month-Year'].unique(),
-            xaxis_tickangle=360 
+            xaxis_tickangle=45 
         )
-
-        st.plotly_chart(fig)
-       
-        st.subheader("Avg Session Duration")
 
         session_data = fetch_session_durations()
 
@@ -846,7 +808,7 @@ def main():
 
             session_data["year_month"] = pd.to_datetime(session_data[["year", "month"]].assign(day=1))
 
-            fig = px.line(
+            fig_1 = px.line(
                 session_data,
                 x="year_month",
                 y="average_duration_combined",
@@ -857,19 +819,15 @@ def main():
                 markers=True
             )
 
-            fig.update_xaxes(
+            fig_1.update_xaxes(
                 tickformat="%b %Y", 
                 title_text="Year-Month",
                 tickmode="linear",   
                 dtick="M1",        
             )
 
-            st.plotly_chart(fig, use_container_width=True)
-
         else:
             st.warning("No data available for session durations.")
-
-        st.subheader("Team Growth")
 
         df = fetch_team_data()
 
@@ -887,7 +845,7 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        fig = px.bar(
+        fig_2 = px.bar(
             df_long, 
             x="month_year", 
             y="count",  
@@ -896,17 +854,14 @@ def main():
             text_auto=True  
         )
 
-        fig.update_layout(
+        fig_2.update_layout(
             barmode="stack", 
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
             legend_title="Entry Type",  
-            showlegend=True
+            showlegend=True,
+            xaxis_tickangle=45 
         )
-
-        st.plotly_chart(fig)
-
-        st.subheader("Member Growth") 
 
         df = fetch_member_data()
 
@@ -924,7 +879,7 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        fig = px.bar(
+        fig_3 = px.bar(
             df_long, 
             x="month_year",  
             y="count", 
@@ -933,17 +888,14 @@ def main():
             text_auto=True  
         )
 
-        fig.update_layout(
+        fig_3.update_layout(
             barmode="stack",  
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
             legend_title="Entry Type",  
-            showlegend=True
+            showlegend=True,
+            xaxis_tickangle=45 
         )
-
-        st.plotly_chart(fig)
-
-        st.subheader("Project Growth")
 
         df = fetch_project_data()
 
@@ -961,7 +913,7 @@ def main():
         }
         df_long["type"] = df_long["type"].replace(type_mapping)
 
-        fig = px.bar(
+        fig_4 = px.bar(
             df_long, 
             x="month_year",
             y="count", 
@@ -970,24 +922,46 @@ def main():
             text_auto=True 
         )
 
-        fig.update_layout(
+        fig_4.update_layout(
             barmode="stack",  
             xaxis_title="Month-Year",
             yaxis_title="Number of Entries",
             legend_title="Entry Type",  
+            xaxis_tickangle=45,
             showlegend=True
         )
 
-        st.plotly_chart(fig)
+        col1, col2 = st.columns(2)
 
-        st.subheader("NPS Feedback")
+        with col1:
+            st.subheader("Monthly Active Users")
+            st.plotly_chart(fig)
+        with col2:
+            st.subheader("Avg Session Duration")
+            st.plotly_chart(fig_1, use_container_width=True)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/NPS+Feedback(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.subheader("Team Growth")
+            st.plotly_chart(fig_2)
+
+        with col4:
+            st.subheader("Member Growth") 
+            st.plotly_chart(fig_3)
+
+        col5, col6 = st.columns(2)
+
+        with col5:
+            st.subheader("Project Growth")
+            st.plotly_chart(fig_4)
+
+        with col6:
+            st.subheader("NPS Feedback")
+            dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/NPS+Feedback(nKPI).png"
+            st.image(dummy_image_url,  width=900)
 
     elif page == 'Knowledge':
-        st.subheader("Office Hours Held (By Type)")
-
         df = fetch_OH_data()
 
         if not df.empty:
@@ -1017,11 +991,9 @@ def main():
 
             fig.update_layout(
                 barmode='stack',
-                xaxis_tickangle=360,  
+                xaxis_tickangle=45,  
                 xaxis={'tickmode': 'array', 'tickvals': df_pivot.index}
             )
-
-            st.plotly_chart(fig)
 
         else:
             st.warning("No data available to display.")
@@ -1029,7 +1001,7 @@ def main():
         try:
             worksheet = sheet.get_worksheet(5)
 
-            data_range_stage = "T1:V5"
+            data_range_stage = "T1:V20"
             data = worksheet.get_values(data_range_stage)
             df3 = pd.DataFrame(data, columns=["Month Year", "Network Density by Member", "Network Density by Team"])
 
@@ -1046,6 +1018,8 @@ def main():
             )
 
             df3_long['Count'] = df3_long['Count'] / 100  
+
+            df3_long = df3_long[df3_long["Count"] > 0]
 
             bar3 = px.bar(
                 df3_long,
@@ -1064,13 +1038,8 @@ def main():
                 yaxis_tickformat='.0%', 
                 xaxis_tickangle=360,  
             )
-
-            st.subheader("% Network Density")
-            st.plotly_chart(bar3)
         except Exception as e:
             st.error(f"An error occurred: {e}")
-
-        st.subheader("Monthly Active Users by Contribution Type - Events")
 
         df = fetch_event_participation_member_data()
 
@@ -1109,7 +1078,7 @@ def main():
                 
                 df_long = df_long[df_long['Count'] > 0]
                 
-                fig = px.bar(
+                fig_1 = px.bar(
                     df_long,
                     x="month_year",  
                     y="Count",  
@@ -1118,23 +1087,18 @@ def main():
                     height=400
                 )
                 
-                fig.update_layout(
+                fig_1.update_layout(
                     barmode='stack',  
-                    xaxis_tickangle=360,  
+                    xaxis_tickangle=45,  
                     legend_title="Type"
                 )
 
-                fig.update_xaxes(
+                fig_1.update_xaxes(
                     tickformat="%b %Y", 
                     title_text="Year-Month",
                     tickmode="linear",   
                     dtick="M1",         
                 )
-
-                
-                st.plotly_chart(fig)
-
-        st.subheader("Monthly Active Teams by Contribution Type - Events")
 
         df = fetch_event_participation_team_data()
 
@@ -1165,59 +1129,467 @@ def main():
                 var_name="Type",
                 value_name="Count"
             )
+            all_months = pd.date_range(start=df_long['month_year'].min(), end=df_long['month_year'].max(), freq='MS').strftime('%Y-%m')
 
-            fig = px.bar(
-                df_long,
-                x="month_year", 
-                y="Count",  
-                color="Type",  
+            all_months_df = pd.DataFrame({'month_year': all_months})
+
+            df_full = pd.merge(all_months_df, df_long, on='month_year', how='left').fillna({'Count': 0})
+
+            fig_2 = px.bar(
+                df_full,
+                x="month_year",
+                y="Count",
+                color="Type",
                 labels={"Count": "Team Count", "month_year": "Month-Year", "Type": "Participant Type"},
                 height=400
             )
 
-            fig.update_layout(
+            fig_2.update_layout(
                 barmode='stack',  
-                xaxis_tickangle=360, 
+                xaxis_tickangle=45, 
                 legend_title="Type"
             )
 
-            fig.update_xaxes(
-                    tickformat="%b %Y", 
-                    title_text="Year-Month",
-                    tickmode="linear",   
-                    dtick="M1",         
-                )
+            fig_2.update_xaxes(
+                tickformat="%b %Y", 
+                title_text="Year-Month",
+                tickmode="linear",   
+                dtick="M1",
+            )
 
-            st.plotly_chart(fig)
         else:
             st.warning("No data available to display.")
 
-    elif page == 'People/Talent':
-        st.subheader("# of Active Users in the Network")
+        col1, col2 = st.columns(2)
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/No.+Of+Avtive+Users+in+Network(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+        with col1:
+            st.subheader("Office Hours Held (By Type)")
+            st.plotly_chart(fig)
+        with col2:
+            st.subheader("% Network Density")
+            st.plotly_chart(bar3)
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.subheader("Monthly Active Users by Contribution Type - Events")
+            st.plotly_chart(fig_1)
+
+        with col4:
+            st.subheader("Monthly Active Teams by Contribution Type - Events") 
+            st.plotly_chart(fig_2)
+
+    elif page == 'People/Talent':
+        try:
+            worksheet = sheet.get_worksheet(6)
+            ranges = ['D1:E20', 'N1:O20', 'S1:W20']
+
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+                df1['Value'] = df1['Value'].replace({',': '', ' ': ''}, regex=True)
+                df1['Value'] = pd.to_numeric(df1['Value'], errors='coerce')
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                df1 = df1[df1['Value'] > 0]
+                
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Active People Count"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+            
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+                df2['Value'] = df2['Value'].replace({',': '', ' ': ''}, regex=True)
+                df2['Value'] = pd.to_numeric(df2['Value'], errors='coerce')
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                df2 = df2[df2['Value'] > 0]
+                bar2 = px.bar(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Network New Hires"},
+                    height=500  
+                )
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')
+
+            data_range3 = ranges[2]
+            data3 = worksheet.get_values(data_range3)
+            if data3 and len(data3[0]) >= 2:
+                df3 = pd.DataFrame(data3[1:], columns=data3[0])
+
+                if "Month Year" in df3.columns:
+                    df3.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
+                for col in df3.columns:
+                    if col != "Month-Year":
+                        df3[col] = pd.to_numeric(df3[col], errors='coerce')
+
+                df3.dropna(subset=["Month-Year"], inplace=True)
+
+                df3["Month-Year"] = pd.to_datetime(df3["Month-Year"], errors="coerce")
+                df3["Month-Year"] = df3["Month-Year"].dt.strftime('%b %Y')
+
+                df3.sort_values(by="Month-Year", inplace=True)
+
+                df3_long = df3.melt(
+                    id_vars="Month-Year",  
+                    value_vars=[col for col in df3.columns if col != "Month-Year"], 
+                    var_name="Type", 
+                    value_name="Value"
+                )
+
+                df3_long = df3_long[df3_long["Value"] > 0]
+
+                bar3 = px.bar(
+                    df3_long,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    color="Type", 
+                    labels={"Month-Year": "Month-Year", "Value": "Monthly Talent"},
+                    height=500,
+                    barmode="stack"  
+                )
+
+                bar3.update_traces(texttemplate='%{text}', textposition='outside') 
+
+                bar3.update_layout(
+                    xaxis_tickformat="%b %Y", 
+                    xaxis_tickangle=-45,  
+                    xaxis_title="Month-Year",
+                    yaxis_title="Monthly Talent",
+                    legend_title="Team Level",
+                    height=500,
+                )
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("# of Active People in the Network")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Monthly New Hires into the Network")
+                st.plotly_chart(bar2)
+
+            col3, col4 = st.columns(2)
+
+            with col3:
+                st.subheader("Monthly Talent / Level Growth")
+                st.plotly_chart(bar3)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
          
     elif page == 'User/Customers':
         st.subheader("")
 
     elif page == 'Programs':
-        st.subheader("Number of teams participating in programs, new vs. repeat")
+        try:
+            worksheet = sheet.get_worksheet(8)
+            ranges = ['D1:E20', 'AF1:AG20']
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/No+of+team+new+and+repeat(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Data"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+            
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                line_chart = px.line(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Cost"},
+                    height=500
+                )
+
+                line_chart.update_traces(
+                    texttemplate='%{text}', 
+                    textposition='top center', 
+                    mode='lines+markers+text'  
+                )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Monthly Aggregated Program Impact Scores")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Program ROI (Imapct vs Cost)")
+                st.plotly_chart(line_chart)
+
+            # col3, col4 = st.columns(2)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
     
     elif page == 'Projects':
-        st.subheader("Project Contributors by Month")
+        try:
+            worksheet = sheet.get_worksheet(7)
+            ranges = ['D1:E20', 'I1:M20']
 
-        dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/Project+Cintributors(nKPI).png"
-        st.image(dummy_image_url,  width=900)
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df1.columns:
+                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+                df1 = df1[df1["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Active People Count"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+
+
+            data_range_stage = ranges[1]
+            data = worksheet.get_values(data_range_stage)
+
+            if data and len(data) > 1:  
+                df3 = pd.DataFrame(data[1:], columns=data[0])
+
+                if "Month Year" in df3.columns:
+                    df3.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
+                for col in ["Projects", "Stars", "Forks", "Repos"]:
+                    if col in df3.columns:
+                        df3[col] = pd.to_numeric(df3[col], errors='coerce')
+
+                df3.dropna(subset=["Month-Year", "Projects", "Stars", "Forks", "Repos"], inplace=True)
+
+                df3["Month-Year"] = pd.to_datetime(df3["Month-Year"], errors="coerce")
+                df3["Month-Year"] = df3["Month-Year"].dt.strftime('%b %Y')
+
+                df3_long = df3.melt(
+                    id_vars=["Month-Year"], 
+                    value_vars=["Projects", "Stars", "Forks", "Repos"],
+                    var_name="Type", 
+                    value_name="Count"
+                )
+
+                df3_long = df3_long[df3_long["Count"] > 0]
+
+                bar3 = px.bar(
+                    df3_long,
+                    x="Month-Year",
+                    y="Count",
+                    text="Count",
+                    color="Type",  
+                    labels={"Month-Year": "Month-Year", "Count": "Value"},
+                    barmode="group",  
+                    height=500
+                )
+
+                bar3.update_traces(texttemplate='%{text}', textposition='outside')
+
+                bar3.update_layout(
+                    xaxis_tickangle=-45,  
+                    xaxis_title="Month-Year",
+                    yaxis_title="Value",
+                    legend_title="Metric Type",
+                    height=500,
+                )
+
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Project Contributors by Month")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Project Adoption:  Stars, Forks, and Repos")
+                st.plotly_chart(bar3)
+
+            # col3, col4 = st.columns(2)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
     elif page == 'Service Providers':
-        st.subheader("")
+        try:
+            worksheet = sheet.get_worksheet(9)
+            ranges = ['I1:J6', 'N1:O6']
+
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df1.columns:
+                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+
+                df1 = df1[df1["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. of Service Providers"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+            
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df2.columns:
+                    df2["Value"] = pd.to_numeric(df2["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+                df2 = df2[df2["Value"] > 0]
+
+                bar2 = px.bar(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. of Service Providers"},
+                    height=500  
+                )
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Service Providers: Listed on Network Tools")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Service Providers:  Match within 6 months")
+                st.plotly_chart(bar2)
+
+            # col3, col4 = st.columns(2)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
     elif page == 'Other Networks':
-        st.subheader("")
+        try:
+            worksheet = sheet.get_worksheet(10)
+            ranges = ['D1:E6', 'I1:J6']
+
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df1.columns:
+                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+
+                df1 = df1[df1["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. of Network"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+            
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df2.columns:
+                    df2["Value"] = pd.to_numeric(df2["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+                df2 = df2[df2["Value"] > 0]
+
+
+                bar2 = px.bar(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "No. of Network"},
+                    height=500  
+                )
+                bar2.update_traces(texttemplate='%{text}', textposition='outside')
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Networks Engaged with PL")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Networks Building/Participating with PL Programs")
+                st.plotly_chart(bar2)
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
 if __name__ == "__main__":
     main()
 
