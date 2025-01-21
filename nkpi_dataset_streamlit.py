@@ -268,53 +268,105 @@ def fetch_OH_data():
     return execute_query(query)
 
 
-
 def fetch_event_participation_member_data():
     query = """
-        SELECT 
-            pe."name" AS event_name,
-            pe."startDate"::date AS event_date,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."memberUid" END) AS host_count,
-            COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."memberUid" END) AS speaker_count,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."memberUid" END) AS attendee_count,
-            COUNT(DISTINCT eg."memberUid") AS total_member_count
+   SELECT 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Host Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."memberUid" END) AS Count
         FROM 
             public."PLEvent" pe
         LEFT JOIN 
             public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        LEFT JOIN 
-            public."Member" m ON eg."memberUid" = m."uid"
         WHERE 
             pe."startDate" IS NOT NULL
         GROUP BY 
-            pe."name", pe."startDate"::date
-        ORDER BY 
-            pe."startDate"::date DESC;
-        """
-    return execute_query(query)
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
 
+        UNION ALL
+
+        SELECT 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Speaker Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."memberUid" END) AS Count
+        FROM 
+            public."PLEvent" pe
+        LEFT JOIN 
+            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+        WHERE 
+            pe."startDate" IS NOT NULL
+        GROUP BY 
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
+
+        UNION ALL
+
+        SELECT 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Attendee Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."memberUid" END) AS Count
+        FROM 
+            public."PLEvent" pe
+        LEFT JOIN 
+            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+        WHERE 
+            pe."startDate" IS NOT NULL
+        GROUP BY 
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
+
+        ORDER BY 
+            month_year ASC, 
+            Type;
+    """
+    return execute_query(query)
 
 def fetch_event_participation_team_data():
     query = """
             SELECT 
-                pe."name" AS event_name,
-                pe."startDate"::date AS event_date,
-                COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."teamUid" END) AS host_count,
-                COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."teamUid" END) AS speaker_count,
-                COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."teamUid" END) AS attendee_count,
-                COUNT(DISTINCT eg."teamUid") AS total_team_count  -- Total number of distinct team in each event
-            FROM 
-                public."PLEvent" pe
-            LEFT JOIN 
-                public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-            LEFT JOIN 
-                public."Team" t ON eg."teamUid" = t."uid"
-            WHERE 
-                pe."startDate" IS NOT null
-    GROUP BY 
-        pe."name", pe."startDate"::date  -- Group by the date-only version of startDate
-    ORDER BY 
-        pe."startDate"::date DESC; 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Host Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."teamUid" END) AS Count
+        FROM 
+            public."PLEvent" pe
+        LEFT JOIN 
+            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+        WHERE 
+            pe."startDate" IS NOT NULL
+        GROUP BY 
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
+
+        UNION ALL
+
+        SELECT 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Speaker Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."teamUid" END) AS Count
+        FROM 
+            public."PLEvent" pe
+        LEFT JOIN 
+            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+        WHERE 
+            pe."startDate" IS NOT NULL
+        GROUP BY 
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
+
+        UNION ALL
+
+        SELECT 
+            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+            'Attendee Count' AS Type,
+            COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."teamUid" END) AS Count
+        FROM 
+            public."PLEvent" pe
+        LEFT JOIN 
+            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+        WHERE 
+            pe."startDate" IS NOT NULL
+        GROUP BY 
+            TO_CHAR(pe."startDate", 'FMMon YYYY')
+
+        ORDER BY 
+            month_year ASC, 
+            Type;
         """
     return execute_query(query)
 
@@ -337,6 +389,16 @@ def process_and_plot(data_range, worksheet, x_col, y_col, y_label):
         df = pd.DataFrame(data[1:], columns=data[0])
         df.rename(columns={"Month Year": "Month-Year", "Data": y_col}, inplace=True)
         df.dropna(subset=["Month-Year", y_col], inplace=True)
+
+        if "Value" in df.columns:
+            df["Value"] = df["Value"].replace({'\$': '', ',': '', '': None}, regex=True)
+            df["Value"] = pd.to_numeric(df["Value"], errors='coerce')
+
+        for col in df.columns:
+            if col != "Month-Year":
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        df = df[df["Value"] > 0]
 
         bar = px.bar(
             df,
@@ -400,7 +462,7 @@ def main():
     if page == "Capital":
         try:
             worksheet = sheet.get_worksheet(1)
-            ranges = ['D1:E8', 'I1:J8', 'N1:O8', 'S1:T8']
+            ranges = ['D1:E20', 'I1:J20', 'N1:O8', 'S1:T20']
 
             bar1 = process_and_plot(ranges[0], worksheet, "Month-Year", "Value", "Amount")
             bar2 = process_and_plot(ranges[1], worksheet, "Month-Year", "Value", "Amount")
@@ -999,7 +1061,7 @@ def main():
             st.warning("No data available to display.")
 
         try:
-            worksheet = sheet.get_worksheet(5)
+            worksheet = sheet.get_worksheet(4)
 
             data_range_stage = "T1:V20"
             data = worksheet.get_values(data_range_stage)
@@ -1043,122 +1105,96 @@ def main():
 
         df = fetch_event_participation_member_data()
 
-        if not df.empty:
-            df['event_date'] = pd.to_datetime(df['event_date'], errors='coerce')
-            df['month_year'] = df['event_date'].dt.to_period('M').astype(str)
-            
-            column_mapping = {
-                "host_count": "Host Count",
-                "speaker_count": "Speaker Count",
-                "attendee_count": "Attendee Count"
-            }
-            df = df.rename(columns=column_mapping)
-            
-            df_pivot = df.pivot_table(
-                index="month_year", 
-                values=["Host Count", "Speaker Count", "Attendee Count"], 
-                aggfunc="sum"
-            ).fillna(0)
-            
-            df_pivot = df_pivot.reset_index()
-            
-            df_pivot = df_pivot[
-                (df_pivot[['Host Count', 'Speaker Count', 'Attendee Count']].sum(axis=1) > 0)
-            ]
-            
-            if df_pivot.empty:
-                st.write("No data available for the selected period.")
-            else:
-                df_long = df_pivot.melt(
-                    id_vars="month_year",  
-                    value_vars=["Host Count", "Speaker Count", "Attendee Count"], 
-                    var_name="Type", 
-                    value_name="Count"  
-                )
-                
-                df_long = df_long[df_long['Count'] > 0]
-                
-                fig_1 = px.bar(
-                    df_long,
-                    x="month_year",  
-                    y="Count",  
-                    color="Type",  
-                    labels={"Count": "Member Count", "month_year": "Month-Year", "Type": "Participant Type"},
-                    height=400
-                )
-                
-                fig_1.update_layout(
-                    barmode='stack',  
-                    xaxis_tickangle=45,  
-                    legend_title="Type"
-                )
-
-                fig_1.update_xaxes(
-                    tickformat="%b %Y", 
-                    title_text="Year-Month",
-                    tickmode="linear",   
-                    dtick="M1",         
-                )
+        if df is not None:
+            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y')
+            df_pivot = df.pivot_table(index='month_year_datetime', columns='type', values='count', aggfunc='sum').reset_index()
+            df_pivot = df_pivot.dropna(subset=['Host Count', 'Speaker Count', 'Attendee Count'], how='all')
+            df_pivot = df_pivot.sort_values('month_year_datetime')
+            sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
+            df_melted = df_pivot.melt(id_vars=['month_year_datetime'], value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
+                              var_name='type', value_name='count')
+            fig_1 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
+               labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
+               height=400)
+            fig_1.update_layout(
+                barmode='stack',
+                xaxis=dict(
+                    type='category',  
+                    tickmode='array',  
+                    tickvals=df_pivot['month_year_datetime'],  
+                    ticktext=sorted_months  
+                ),
+                showlegend=True
+            )
+        else:
+            st.warning("No data available")
 
         df = fetch_event_participation_team_data()
 
-        if not df.empty:
-            df['event_date'] = pd.to_datetime(df['event_date'], errors='coerce')
-            df['month_year'] = df['event_date'].dt.to_period('M').astype(str)
-
-            column_mapping = {
-                "host_count": "Host Count",
-                "speaker_count": "Speaker Count",
-                "attendee_count": "Attendee Count"
-            }
-            df = df.rename(columns=column_mapping)
-
-            df_pivot = df.pivot_table(
-                index="month_year", 
-                values=["Host Count", "Speaker Count", "Attendee Count"], 
-                aggfunc="sum"
-            ).fillna(0)
-
-            df_pivot = df_pivot.reset_index()
-            months_to_remove = ["2024-01", "2024-02", "2024-03", "2024-10"]
-            df_pivot = df_pivot[~df_pivot['month_year'].isin(months_to_remove)]
-
-            df_long = df_pivot.melt(
-                id_vars="month_year",  
-                value_vars=["Host Count", "Speaker Count", "Attendee Count"], 
-                var_name="Type",
-                value_name="Count"
-            )
-            all_months = pd.date_range(start=df_long['month_year'].min(), end=df_long['month_year'].max(), freq='MS').strftime('%Y-%m')
-
-            all_months_df = pd.DataFrame({'month_year': all_months})
-
-            df_full = pd.merge(all_months_df, df_long, on='month_year', how='left').fillna({'Count': 0})
-
-            fig_2 = px.bar(
-                df_full,
-                x="month_year",
-                y="Count",
-                color="Type",
-                labels={"Count": "Team Count", "month_year": "Month-Year", "Type": "Participant Type"},
-                height=400
-            )
-
+        if df is not None:
+            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y')
+            df_pivot = df.pivot_table(index='month_year_datetime', columns='type', values='count', aggfunc='sum').reset_index()
+            df_pivot = df_pivot.dropna(subset=['Host Count', 'Speaker Count', 'Attendee Count'], how='all')
+            df_pivot = df_pivot.sort_values('month_year_datetime')
+            sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
+            df_melted = df_pivot.melt(id_vars=['month_year_datetime'], value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
+                              var_name='type', value_name='count')
+            fig_2 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
+               labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
+               height=400)
             fig_2.update_layout(
-                barmode='stack',  
-                xaxis_tickangle=45, 
-                legend_title="Type"
+                barmode='stack',
+                xaxis=dict(
+                    type='category',  
+                    tickmode='array',  
+                    tickvals=df_pivot['month_year_datetime'],  
+                    ticktext=sorted_months  
+                ),
+                showlegend=True
             )
-
-            fig_2.update_xaxes(
-                tickformat="%b %Y", 
-                title_text="Year-Month",
-                tickmode="linear",   
-                dtick="M1",
-            )
-
         else:
-            st.warning("No data available to display.")
+            st.warning("No data available")
+
+        worksheet = sheet.get_worksheet(4)
+        data_range_stage = "L1:O20"
+        data2 = worksheet.get_values(data_range_stage)
+
+        columns = ['Month Year', '# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs']
+        df = pd.DataFrame(data2[1:], columns=columns) 
+
+        df['month_year_datetime'] = pd.to_datetime(df['Month Year'], errors='coerce')
+
+        df_pivot = df.pivot_table(index='month_year_datetime', 
+                                values=['# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs'], 
+                                aggfunc='sum').reset_index()
+
+        df_pivot = df_pivot.dropna(subset=['# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs'], how='all')
+        df_pivot = df_pivot.sort_values('month_year_datetime')
+        sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
+        df_melted = df_pivot.melt(id_vars=['month_year_datetime'], 
+                                value_vars=['# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs'],
+                                var_name='type', value_name='hours')
+
+        df_melted['type'] = df_melted['type'].replace({
+            '# of hours of blog reading': 'Blog Reading',
+            '# of hours of workshops/problem solving': 'Workshop',
+            '# of hours of OHs': 'OH'
+        })
+
+        bar2 = px.bar(df_melted, x='month_year_datetime', y='hours', color='type',
+                    labels={'month_year_datetime': 'Month-Year', 'hours': 'Hours', 'type': 'Type'},
+                    height=400)
+
+        bar2.update_layout(
+            barmode='stack',
+            xaxis=dict(
+                type='category',  
+                tickmode='array',  
+                tickvals=df_pivot['month_year_datetime'],  
+                ticktext=sorted_months  
+            ),
+            showlegend=True
+        )
 
         col1, col2 = st.columns(2)
 
@@ -1178,6 +1214,13 @@ def main():
         with col4:
             st.subheader("Monthly Active Teams by Contribution Type - Events") 
             st.plotly_chart(fig_2)
+
+        col5, col6 = st.columns(2)
+
+        with col5:
+            st.subheader("Hours of knowledge Contributed") 
+            st.plotly_chart(bar2)
+            
 
     elif page == 'People/Talent':
         try:
@@ -1309,6 +1352,14 @@ def main():
                 df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
                 df1.dropna(subset=["Month-Year", "Value"], inplace=True)
 
+                if "Value" in df1.columns:
+                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+                df1 = df1[df1["Value"] > 0]
+
                 bar1 = px.bar(
                     df1,
                     x="Month-Year",
@@ -1327,12 +1378,22 @@ def main():
                 df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
                 df2.dropna(subset=["Month-Year", "Value"], inplace=True)
 
+                if "Value" in df2.columns:
+                    df2["Value"] = df2["Value"].replace({'\$': '', ',': '', '': None}, regex=True)
+                    df2["Value"] = pd.to_numeric(df2["Value"], errors='coerce')
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+
+                df2 = df2[df2["Value"] > 0]
+
                 line_chart = px.line(
                     df2,
                     x="Month-Year",
                     y="Value",
                     text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "Cost"},
+                    labels={"Month-Year": "Month-Year", "Value": "Cost($)"},
                     height=500
                 )
 
@@ -1453,7 +1514,7 @@ def main():
     elif page == 'Service Providers':
         try:
             worksheet = sheet.get_worksheet(9)
-            ranges = ['I1:J6', 'N1:O6']
+            ranges = ['I1:J20', 'N1:O20']
 
             data_range1 = ranges[0]
             data1 = worksheet.get_values(data_range1)
@@ -1523,7 +1584,7 @@ def main():
     elif page == 'Other Networks':
         try:
             worksheet = sheet.get_worksheet(10)
-            ranges = ['D1:E6', 'I1:J6']
+            ranges = ['D1:E20', 'I1:J20']
 
             data_range1 = ranges[0]
             data1 = worksheet.get_values(data_range1)
