@@ -271,102 +271,111 @@ def fetch_OH_data():
 def fetch_event_participation_member_data():
     query = """
    SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Host Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."memberUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    pe."uid" AS event_uid,  -- Include the event UID in the result
+    'Host Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."memberUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'),
+    pe."uid"
 
-        UNION ALL
+UNION ALL
 
-        SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Speaker Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."memberUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+SELECT 
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    pe."uid" AS event_uid,  -- Include the event UID in the result
+    'Speaker Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."memberUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'),
+    pe."uid"
 
-        UNION ALL
+UNION ALL
 
-        SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Attendee Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."memberUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+SELECT 
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    pe."uid" AS event_uid,  -- Include the event UID in the result
+    'Attendee Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."memberUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'),
+    pe."uid"
 
-        ORDER BY 
-            month_year ASC, 
-            Type;
+ORDER BY 
+    month_year ASC, 
+    Type, 
+    event_uid;  -- Order by event_uid as well
+
     """
     return execute_query(query)
 
 def fetch_event_participation_team_data():
     query = """
             SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Host Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."teamUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    'Host Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isHost" = true THEN eg."teamUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'), pe."uid"
 
-        UNION ALL
+UNION ALL
 
-        SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Speaker Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."teamUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+SELECT 
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    'Speaker Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isSpeaker" = true THEN eg."teamUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'), pe."uid"
 
-        UNION ALL
+UNION ALL
 
-        SELECT 
-            TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
-            'Attendee Count' AS Type,
-            COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."teamUid" END) AS Count
-        FROM 
-            public."PLEvent" pe
-        LEFT JOIN 
-            public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
-        WHERE 
-            pe."startDate" IS NOT NULL
-        GROUP BY 
-            TO_CHAR(pe."startDate", 'FMMon YYYY')
+SELECT 
+    TO_CHAR(pe."startDate", 'FMMon YYYY') AS month_year,  
+    'Attendee Count' AS Type,
+    COUNT(DISTINCT CASE WHEN eg."isHost" = false AND eg."isSpeaker" = false THEN eg."teamUid" END) AS Count
+FROM 
+    public."PLEvent" pe
+LEFT JOIN 
+    public."PLEventGuest" eg ON pe."uid" = eg."eventUid"
+WHERE 
+    pe."startDate" IS NOT NULL
+GROUP BY 
+    TO_CHAR(pe."startDate", 'FMMon YYYY'), pe."uid"
 
-        ORDER BY 
-            month_year ASC, 
-            Type;
+ORDER BY 
+    month_year ASC, 
+    Type;
+
         """
     return execute_query(query)
 
@@ -425,11 +434,11 @@ def main():
             "Network Tooling",
             "Knowledge",
             "People/Talent",
-            "User/Customers",
-            "Programs",
             "Projects",
+            "Programs",
             "Service Providers",
-            "Other Networks"
+            "Other Networks",
+            "User/Customers"
         ]
     )
 
@@ -806,8 +815,9 @@ def main():
             col1, col2 = st.columns(2)
 
             with col1:
-                st.subheader("Engagement Rate")
-                st.plotly_chart(bar1)
+                st.subheader("Share of Voice")
+                dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/share+of+voice(nKPI).png"
+                st.image(dummy_image_url,  width=900)
 
             with col2:
                 st.subheader("Audience Growth")
@@ -816,182 +826,155 @@ def main():
             col3, col4 = st.columns(2)
 
             with col3:
-                st.subheader("Email Subscribers")
-                st.plotly_chart(bar3)
+                st.subheader("Engagement Rate")
+                st.plotly_chart(bar1)
 
             with col4:
-                st.subheader("Share of Voice")
-                dummy_image_url = "https://plabs-assets.s3.us-west-1.amazonaws.com/share+of+voice(nKPI).png"
-                st.image(dummy_image_url,  width=900)
-
+                st.subheader("Email Subscribers")
+                st.plotly_chart(bar3)
+                
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
     elif page == 'Network Tooling':
-        df = fetch_monthly_active_user()
+        worksheet = sheet.get_worksheet(5)
+        data_range2 = 'D1:F20'
+        data2 = worksheet.get_values(data_range2)
+        if data2 and len(data2[0]) >= 2:
+            df2 = pd.DataFrame(data2[1:], columns=data2[0])
 
-        df['month'] = df['month'].astype(int)  
-        df['year'] = df['year'].astype(int)    
+            if "Month Year" in df2.columns:
+                df2.rename(columns={"Month Year": "Month-Year"}, inplace=True)
 
-        df['Month-Year'] = df.apply(lambda row: pd.to_datetime(f"{row['month']}-01-{row['year']}", format="%m-%d-%Y").strftime("%b %Y"), axis=1)
+            for col in df2.columns:
+                if col != "Month-Year":
+                    df2[col] = pd.to_numeric(df2[col], errors='coerce')
 
-        df_long = df.melt(id_vars=['Month-Year'], value_vars=['guest_user_count', 'active_user_count'],
-                        var_name='Type', value_name='user_count')
+            df2.dropna(subset=["Month-Year"], inplace=True)
 
-        df_long['Type'] = df_long['Type'].map({
-            'guest_user_count': 'Visitor',
-            'active_user_count': 'Logged-In'        })
+            df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")
 
-        fig = px.bar(
-            df_long,
-            x='Month-Year',
-            y='user_count',
-            color='Type',
-            labels={'Month-Year': 'Month-Year', 'user_count': 'User Count'},
-            color_discrete_map={'Visitor': 'blue', 'Logged-In': 'orange'},
-            barmode='stack',
-        )
-
-        fig.update_traces(texttemplate='%{y}', textposition='outside')
-
-        fig.update_layout(
-            xaxis_tickmode='array',
-            xaxis_tickvals=df['Month-Year'].unique(),
-            xaxis_ticktext=df['Month-Year'].unique(),
-            xaxis_tickangle=45 
-        )
-
-        session_data = fetch_session_durations()
-
-        if not session_data.empty:
-            session_data["average_duration_combined"] = (
-                session_data["average_duration_minutes"] + session_data["average_duration_seconds"] / 60
+            df2.sort_values(by="Month-Year", inplace=True)
+            df2_long = df2.melt(
+                id_vars="Month-Year",  
+                value_vars=[col for col in df2.columns if col != "Month-Year"],  
+                var_name="Type", 
+                value_name="Value"
             )
 
-            session_data["year_month"] = pd.to_datetime(session_data[["year", "month"]].assign(day=1))
-
-            fig_1 = px.line(
-                session_data,
-                x="year_month",
-                y="average_duration_combined",
-                labels={
-                    "year_month": "Year-Month",
-                    "average_duration_combined": "Avg Duration (minutes.seconds)"
-                },
-                markers=True
+            df2_long = df2_long[df2_long["Value"] > 0]
+            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')  
+            fig = px.bar(
+                df2_long,
+                x="Month-Year",
+                y="Value",
+                color="Type", 
+                text="Value", 
+                labels={"Month-Year": "Month-Year", "Value": "Count"},
+                height=500,
+                barmode="stack"  
             )
 
-            fig_1.update_xaxes(
-                tickformat="%b %Y", 
-                title_text="Year-Month",
-                tickmode="linear",   
-                dtick="M1",        
+            fig.update_traces(texttemplate='%{text}', textposition='outside')
+
+            fig.update_layout(
+                xaxis=dict(
+                    type="category",  
+                    tickmode="array",  
+                    tickvals=df2_long["Month-Year"]                ),
+                xaxis_title="Month-Year",
+                xaxis_tickangle=45,  
+                yaxis_title="Count",
+                showlegend=True
             )
 
-        else:
-            st.warning("No data available for session durations.")
+        worksheet = sheet.get_worksheet(5)
+        data_range2 = 'J1:K13'
+        df = worksheet.get_values(data_range2)
 
-        df = fetch_team_data()
-
-        df_long = df.melt(
-            id_vars=["month_year"],  
-            value_vars=["new_entries", "existing_entries", "total_entries"], 
-            var_name="type",  
-            value_name="count" 
+        df = pd.DataFrame(df[1:], columns=df[0])
+        df['Minutes'] = df['Time (Min.Sec)'].astype(str).str.split('.').apply(
+            lambda x: int(x[0]) + (int(x[1]) / 60 if len(x) > 1 and x[1].isdigit() else 0) if x[0].isdigit() else None
         )
+        fig_1 = px.line(df, x='Month Year', y='Minutes', markers=True,
+                    labels={'Month Year': 'Month-Year', 'Minutes': 'Min & Sec)'},
+                    )
+        fig_1.update_layout(xaxis_tickformat='%b %Y', xaxis_title='Month-Year', yaxis_title='Min & Sec')
 
-        type_mapping = {
-            "new_entries": "New Entries",
-            "existing_entries": "Existing Entries",
-            "total_entries": "Total Entries"
-        }
-        df_long["type"] = df_long["type"].replace(type_mapping)
+        data_range3 = 'O2:R9'
+        df = worksheet.get_values(data_range3)
+        df = pd.DataFrame(df[1:], columns=df[0])
+        df.columns.values[0] = "Month Year"  
+
+        df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+        df[["New Users", "Existing Users", "Total Users"]] = df[["New Users", "Existing Users", "Total Users"]].astype(int)
+        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Users", "Existing Users", "Total Users"],
+                            var_name="User Type", value_name="Count")
 
         fig_2 = px.bar(
-            df_long, 
-            x="month_year", 
-            y="count",  
-            color="type", 
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"}, 
-            text_auto=True  
+            df_melted,
+            x="Month-Year",
+            y="Count",
+            color="User Type",
+            text="Count",
+            labels={"Month-Year": "Month-Year", "Count": "User Count", "User Type": "Category"},
+            height=500,
+            barmode="stack"
         )
 
-        fig_2.update_layout(
-            barmode="stack", 
-            xaxis_title="Month-Year",
-            yaxis_title="Number of Entries",
-            legend_title="Entry Type",  
-            showlegend=True,
-            xaxis_tickangle=45 
-        )
+        fig_2.update_traces(texttemplate='%{text}', textposition='outside')
+        fig_2.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
+                            )
 
-        df = fetch_member_data()
+        data_range3 = 'O12:R19'
+        df = worksheet.get_values(data_range3)
+        df = pd.DataFrame(df[1:], columns=df[0])
+        df.columns.values[0] = "Month Year"  
 
-        df_long = df.melt(
-            id_vars=["month_year"],  
-            value_vars=["new_entries", "existing_entries", "total_entries"], 
-            var_name="type", 
-            value_name="count"  
-        )
-
-        type_mapping = {
-            "new_entries": "New Entries",
-            "existing_entries": "Existing Entries",
-            "total_entries": "Total Entries"
-        }
-        df_long["type"] = df_long["type"].replace(type_mapping)
+        df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+        df[["New Teams", "Existing Teams", "Total Teams"]] = df[["New Teams", "Existing Teams", "Total Teams"]].astype(int)
+        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Teams", "Existing Teams", "Total Teams"],
+                            var_name="Teams Type", value_name="Count")
 
         fig_3 = px.bar(
-            df_long, 
-            x="month_year",  
-            y="count", 
-            color="type",  
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"},  
-            text_auto=True  
+            df_melted,
+            x="Month-Year",
+            y="Count",
+            color="Teams Type",
+            text="Count",
+            labels={"Month-Year": "Month-Year", "Count": "Teams Count", "Teams Type": "Category"},
+            height=500,
+            barmode="stack"
         )
 
-        fig_3.update_layout(
-            barmode="stack",  
-            xaxis_title="Month-Year",
-            yaxis_title="Number of Entries",
-            legend_title="Entry Type",  
-            showlegend=True,
-            xaxis_tickangle=45 
-        )
+        fig_3.update_traces(texttemplate='%{text}', textposition='outside')
+        fig_3.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
+                            )
 
-        df = fetch_project_data()
+        data_range3 = 'O22:R29'
+        df = worksheet.get_values(data_range3)
+        df = pd.DataFrame(df[1:], columns=df[0])
+        df.columns.values[0] = "Month Year"  
 
-        df_long = df.melt(
-            id_vars=["month_year"],  
-            value_vars=["new_entries", "existing_entries", "total_entries"], 
-            var_name="type", 
-            value_name="count"  
-        )
-
-        type_mapping = {
-            "new_entries": "New Entries",
-            "existing_entries": "Existing Entries",
-            "total_entries": "Total Entries"
-        }
-        df_long["type"] = df_long["type"].replace(type_mapping)
+        df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+        df[["New Projects", "Existing Projects", "Total Projects"]] = df[["New Projects", "Existing Projects", "Total Projects"]].astype(int)
+        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Projects", "Existing Projects", "Total Projects"],
+                            var_name="Projects Type", value_name="Count")
 
         fig_4 = px.bar(
-            df_long, 
-            x="month_year",
-            y="count", 
-            color="type",  
-            labels={"month_year": "Month-Year", "count": "Number of Entries", "type": "Entry Type"}, 
-            text_auto=True 
+            df_melted,
+            x="Month-Year",
+            y="Count",
+            color="Projects Type",
+            text="Count",
+            labels={"Month-Year": "Month-Year", "Count": "Projects Count", "Projects Type": "Category"},
+            height=500,
+            barmode="stack"
         )
 
-        fig_4.update_layout(
-            barmode="stack",  
-            xaxis_title="Month-Year",
-            yaxis_title="Number of Entries",
-            legend_title="Entry Type",  
-            xaxis_tickangle=45,
-            showlegend=True
-        )
+        fig_4.update_traces(texttemplate='%{text}', textposition='outside')
+        fig_4.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
+                            )
 
         col1, col2 = st.columns(2)
 
@@ -1024,41 +1007,56 @@ def main():
             st.image(dummy_image_url,  width=900)
 
     elif page == 'Knowledge':
-        df = fetch_OH_data()
+        worksheet = sheet.get_worksheet(4)
+        data_range2 = 'D1:G20'
+        data2 = worksheet.get_values(data_range2)
+        if data2 and len(data2[0]) >= 2:
+            df2 = pd.DataFrame(data2[1:], columns=data2[0])
 
-        if not df.empty:
-            df['month_year'] = pd.to_datetime(df['month_year'], format='%Y-%m')
+            if "Month Year" in df2.columns:
+                df2.rename(columns={"Month Year": "Month-Year"}, inplace=True)
 
-            all_months = pd.date_range(df['month_year'].min(), df['month_year'].max(), freq='MS')
+            for col in df2.columns:
+                if col != "Month-Year":
+                    df2[col] = pd.to_numeric(df2[col], errors='coerce')
 
-            df_full = pd.DataFrame(all_months, columns=['month_year'])
-            df_full['month_year'] = pd.to_datetime(df_full['month_year'])
+            df2.dropna(subset=["Month-Year"], inplace=True)
 
-            df_merged = pd.merge(df_full, df, on='month_year', how='left').fillna({'interaction_count': 0})
+            df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")
 
-            df_merged['month_year'] = df_merged['month_year'].dt.strftime('%b %Y')
-
-            df_merged['month_year'] = pd.to_datetime(df_merged['month_year'], format='%b %Y')
-            df_merged = df_merged.sort_values('month_year')
-
-            df_pivot = df_merged.pivot_table(index="month_year", columns="page_type", values="interaction_count", aggfunc="sum").fillna(0)
-
-            df_pivot.index = df_pivot.index.strftime('%b %Y')
-
-            fig = px.bar(df_pivot,
-                        x=df_pivot.index,  
-                        y=df_pivot.columns,  
-                        labels={"value": "Interaction Count", "month_year": "Month-Year", "page_type": "Page Type"},
-                        height=400)
-
-            fig.update_layout(
-                barmode='stack',
-                xaxis_tickangle=45,  
-                xaxis={'tickmode': 'array', 'tickvals': df_pivot.index}
+            df2.sort_values(by="Month-Year", inplace=True)
+            df2_long = df2.melt(
+                id_vars="Month-Year",  
+                value_vars=[col for col in df2.columns if col != "Month-Year"],  
+                var_name="Type", 
+                value_name="Value"
             )
 
-        else:
-            st.warning("No data available to display.")
+            df2_long = df2_long[df2_long["Value"] > 0]
+
+            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')  
+            fig = px.bar(
+                df2_long,
+                x="Month-Year",
+                y="Value",
+                color="Type", 
+                text="Value", 
+                labels={"Month-Year": "Month-Year", "Value": "Office Hours"},
+                height=500,
+                barmode="stack"  
+            )
+
+            fig.update_traces(texttemplate='%{text}', textposition='outside')
+
+            fig.update_layout(
+                xaxis=dict(
+                    type="category",  
+                    tickmode="array",  
+                    tickvals=df2_long["Month-Year"]                ),
+                xaxis_title="Month-Year",
+                yaxis_title="Office Hours",
+                showlegend=True
+            )
 
         try:
             worksheet = sheet.get_worksheet(4)
@@ -1090,7 +1088,7 @@ def main():
                 text="Count",
                 color="Type", 
                 labels={"Month Year": "Month Year", "Count": "% Network Density"},
-                barmode="stack",  
+                barmode="group",  
                 height=500
             )
 
@@ -1113,9 +1111,13 @@ def main():
             sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
             df_melted = df_pivot.melt(id_vars=['month_year_datetime'], value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
                               var_name='type', value_name='count')
+            df_melted['count'].fillna(0, inplace=True)
             fig_1 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
                labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
-               height=400)
+               text='count',
+               height=500)
+
+            fig_1.update_traces(texttemplate='%{y}', textposition='outside')
             fig_1.update_layout(
                 barmode='stack',
                 xaxis=dict(
@@ -1141,7 +1143,9 @@ def main():
                               var_name='type', value_name='count')
             fig_2 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
                labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
-               height=400)
+               text='count',
+               height=500)
+            fig_2.update_traces(texttemplate='%{y}', textposition='outside')
             fig_2.update_layout(
                 barmode='stack',
                 xaxis=dict(
@@ -1183,7 +1187,9 @@ def main():
 
         bar2 = px.bar(df_melted, x='month_year_datetime', y='hours', color='type',
                     labels={'month_year_datetime': 'Month-Year', 'hours': 'Hours', 'type': 'Type'},
-                    height=400)
+                    text='hours',
+                    height=500)
+        bar2.update_traces(texttemplate='%{y}', textposition='outside')
 
         bar2.update_layout(
             barmode='stack',
@@ -1202,26 +1208,25 @@ def main():
             st.subheader("Office Hours Held (By Type)")
             st.plotly_chart(fig)
         with col2:
-            st.subheader("% Network Density")
-            st.plotly_chart(bar3)
+            st.subheader("Hours of knowledge Contributed") 
+            st.plotly_chart(bar2)
 
         col3, col4 = st.columns(2)
 
         with col3:
-            st.subheader("Monthly Active Users by Contribution Type - Events")
-            st.plotly_chart(fig_1)
+            st.subheader("% Network Density")
+            st.plotly_chart(bar3)
 
         with col4:
-            st.subheader("Monthly Active Teams by Contribution Type - Events") 
-            st.plotly_chart(fig_2)
+            st.subheader("Monthly Active Users by Contribution Type - Events")
+            st.plotly_chart(fig_1)
 
         col5, col6 = st.columns(2)
 
         with col5:
-            st.subheader("Hours of knowledge Contributed") 
-            st.plotly_chart(bar2)
-            
-
+            st.subheader("Monthly Active Teams by Contribution Type - Events") 
+            st.plotly_chart(fig_2)
+    
     elif page == 'People/Talent':
         try:
             worksheet = sheet.get_worksheet(6)
@@ -1336,87 +1341,7 @@ def main():
                 st.plotly_chart(bar3)
         except Exception as e:
             st.error(f"An error occurred: {e}")
-         
-    elif page == 'User/Customers':
-        st.subheader("")
 
-    elif page == 'Programs':
-        try:
-            worksheet = sheet.get_worksheet(8)
-            ranges = ['D1:E20', 'AF1:AG20']
-
-            data_range1 = ranges[0]
-            data1 = worksheet.get_values(data_range1)
-            if data1 and len(data1[0]) >= 2:
-                df1 = pd.DataFrame(data1[1:], columns=data1[0])
-                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                if "Value" in df1.columns:
-                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
-
-                for col in df1.columns:
-                    if col != "Month-Year":
-                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
-                df1 = df1[df1["Value"] > 0]
-
-                bar1 = px.bar(
-                    df1,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "Data"},
-                    height=500  
-                )
-                bar1.update_traces(texttemplate='%{text}', textposition='outside')
-            
-            data_range2 = ranges[1]
-            data2 = worksheet.get_values(data_range2)
-
-            if data2 and len(data2[0]) >= 2:
-                df2 = pd.DataFrame(data2[1:], columns=data2[0])
-                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
-                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
-
-                if "Value" in df2.columns:
-                    df2["Value"] = df2["Value"].replace({'\$': '', ',': '', '': None}, regex=True)
-                    df2["Value"] = pd.to_numeric(df2["Value"], errors='coerce')
-
-                for col in df2.columns:
-                    if col != "Month-Year":
-                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
-
-                df2 = df2[df2["Value"] > 0]
-
-                line_chart = px.line(
-                    df2,
-                    x="Month-Year",
-                    y="Value",
-                    text="Value",
-                    labels={"Month-Year": "Month-Year", "Value": "Cost($)"},
-                    height=500
-                )
-
-                line_chart.update_traces(
-                    texttemplate='%{text}', 
-                    textposition='top center', 
-                    mode='lines+markers+text'  
-                )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.subheader("Monthly Aggregated Program Impact Scores")
-                st.plotly_chart(bar1)
-
-            with col2:
-                st.subheader("Program ROI (Imapct vs Cost)")
-                st.plotly_chart(line_chart)
-
-            # col3, col4 = st.columns(2)
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-    
     elif page == 'Projects':
         try:
             worksheet = sheet.get_worksheet(7)
@@ -1506,6 +1431,83 @@ def main():
             with col2:
                 st.subheader("Project Adoption:  Stars, Forks, and Repos")
                 st.plotly_chart(bar3)
+
+            # col3, col4 = st.columns(2)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    elif page == 'Programs':
+        try:
+            worksheet = sheet.get_worksheet(8)
+            ranges = ['D1:E20', 'AF1:AG20']
+
+            data_range1 = ranges[0]
+            data1 = worksheet.get_values(data_range1)
+            if data1 and len(data1[0]) >= 2:
+                df1 = pd.DataFrame(data1[1:], columns=data1[0])
+                df1.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df1.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df1.columns:
+                    df1["Value"] = pd.to_numeric(df1["Value"].replace({',': '', '': None}).apply(lambda x: float(x) if x else None), errors='coerce')
+
+                for col in df1.columns:
+                    if col != "Month-Year":
+                        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+                df1 = df1[df1["Value"] > 0]
+
+                bar1 = px.bar(
+                    df1,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Data"},
+                    height=500  
+                )
+                bar1.update_traces(texttemplate='%{text}', textposition='outside')
+            
+            data_range2 = ranges[1]
+            data2 = worksheet.get_values(data_range2)
+
+            if data2 and len(data2[0]) >= 2:
+                df2 = pd.DataFrame(data2[1:], columns=data2[0])
+                df2.rename(columns={"Month Year": "Month-Year", "Data": "Value"}, inplace=True)
+                df2.dropna(subset=["Month-Year", "Value"], inplace=True)
+
+                if "Value" in df2.columns:
+                    df2["Value"] = df2["Value"].replace({'\$': '', ',': '', '': None}, regex=True)
+                    df2["Value"] = pd.to_numeric(df2["Value"], errors='coerce')
+
+                for col in df2.columns:
+                    if col != "Month-Year":
+                        df2[col] = pd.to_numeric(df2[col], errors='coerce')
+
+                df2 = df2[df2["Value"] > 0]
+
+                line_chart = px.line(
+                    df2,
+                    x="Month-Year",
+                    y="Value",
+                    text="Value",
+                    labels={"Month-Year": "Month-Year", "Value": "Cost($)"},
+                    height=500
+                )
+
+                line_chart.update_traces(
+                    texttemplate='%{text}', 
+                    textposition='top center', 
+                    mode='lines+markers+text'  
+                )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Monthly Aggregated Program Impact Scores")
+                st.plotly_chart(bar1)
+
+            with col2:
+                st.subheader("Program ROI (Imapct vs Cost)")
+                st.plotly_chart(line_chart)
 
             # col3, col4 = st.columns(2)
         except Exception as e:
@@ -1650,6 +1652,9 @@ def main():
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
+    elif page == 'User/Customers':
+        st.subheader("")
 
 if __name__ == "__main__":
     main()
