@@ -889,7 +889,7 @@ def main():
             )
 
         worksheet = sheet.get_worksheet(5)
-        data_range2 = 'J1:K13'
+        data_range2 = 'J1:K14'
         df = worksheet.get_values(data_range2)
 
         df = pd.DataFrame(df[1:], columns=df[0])
@@ -901,7 +901,7 @@ def main():
                     )
         fig_1.update_layout(xaxis_tickformat='%b %Y', xaxis_title='Month-Year', yaxis_title='Min & Sec')
 
-        data_range3 = 'O2:R9'
+        data_range3 = 'O2:R10'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
         df.columns.values[0] = "Month Year"  
@@ -926,7 +926,7 @@ def main():
         fig_2.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
                             )
 
-        data_range3 = 'O12:R19'
+        data_range3 = 'O12:R20'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
         df.columns.values[0] = "Month Year"  
@@ -951,7 +951,7 @@ def main():
         fig_3.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
                             )
 
-        data_range3 = 'O22:R29'
+        data_range3 = 'O22:R30'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
         df.columns.values[0] = "Month Year"  
