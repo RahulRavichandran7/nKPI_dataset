@@ -513,50 +513,64 @@ def main():
                 df1 = pd.DataFrame(data1[1:], columns=data1[0])
                 if "Month Year" in df1.columns:
                     df1.rename(columns={"Month Year": "Month-Year"}, inplace=True)
+
                 for col in df1.columns:
                     if col != "Month-Year":
                         df1[col] = pd.to_numeric(df1[col], errors='coerce')
 
                 df1.dropna(subset=["Month-Year"], inplace=True)
-
-                df1["Month-Year"] = pd.to_datetime(df1["Month-Year"], errors="coerce")
-
-                df1["Month-Year"] = df1["Month-Year"].dt.strftime('%b %Y')
-
+                df1["Month-Year"] = pd.to_datetime(df1["Month-Year"], errors="coerce").dt.strftime('%b %Y')
                 df1.sort_values(by="Month-Year", inplace=True)
 
                 df1_long = df1.melt(
-                    id_vars="Month-Year",  
-                    value_vars=[col for col in df1.columns if col != "Month-Year"], 
-                    var_name="Type", 
+                    id_vars="Month-Year",
+                    value_vars=[col for col in df1.columns if col != "Month-Year"],
+                    var_name="Type",
                     value_name="Value"
                 )
-
                 df1_long = df1_long[df1_long["Value"] > 0]
 
+                # Create stacked bar chart
                 bar1 = px.bar(
                     df1_long,
                     x="Month-Year",
                     y="Value",
-                    text="Value",
-                    color="Type", 
+                    color="Type",
+                    # text="",  # Hide individual stack values
                     labels={"Month-Year": "Month-Year", "Value": "No. Of Teams"},
                     height=500,
-                    barmode="stack" 
+                    barmode="stack"
                 )
-                bar1.update_traces(texttemplate='%{text}', textposition='outside') 
+
+                # Compute totals for each bar
+                totals1 = df1_long.groupby("Month-Year")["Value"].sum().reset_index()
+
+                # Add total annotations
+                annotations1 = []
+                for i, row in totals1.iterrows():
+                    annotations1.append(
+                        dict(
+                            x=row["Month-Year"],
+                            y=row["Value"]+0.2,  # Adjust the position above the bar
+                            text=f"{int(row['Value'])}",
+                            showarrow=False,
+                            font=dict(size=14,family="Arial Bold")
+                        )
+                    )
 
                 bar1.update_layout(
-                    xaxis_tickformat="%b %Y", 
+                    xaxis_tickformat="%b %Y",
                     xaxis_tickangle=360,
+                    annotations=annotations1
                 )
 
+
+            # Bar chart for data_range2
             data_range2 = ranges[1]
             data2 = worksheet.get_values(data_range2)
 
             if data2 and len(data2[0]) >= 2:
                 df2 = pd.DataFrame(data2[1:], columns=data2[0])
-
                 if "Month Year" in df2.columns:
                     df2.rename(columns={"Month Year": "Month-Year"}, inplace=True)
 
@@ -565,7 +579,7 @@ def main():
                         df2[col] = pd.to_numeric(df2[col], errors='coerce')
 
                 df2.dropna(subset=["Month-Year"], inplace=True)
-                df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")        
+                df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce").dt.strftime('%b %Y')
                 df2.sort_values("Month-Year", inplace=True)
 
                 df2_long = df2.melt(
@@ -574,32 +588,39 @@ def main():
                     var_name="Type",
                     value_name="Value"
                 )
-
                 df2_long = df2_long[df2_long["Value"] > 0]
 
+                # Create stacked bar chart
                 bar2 = px.bar(
                     df2_long,
                     x="Month-Year",
                     y="Value",
-                    text="Value",
                     color="Type",
+                    # text="",  # Hide individual stack values
                     labels={"Month-Year": "Month-Year", "Value": "No. Of Teams"},
                     height=500,
                     barmode="stack"
                 )
-                bar2.update_traces(texttemplate='%{text}', textposition='outside')
+
+                # Compute totals for each bar
+                totals2 = df2_long.groupby("Month-Year")["Value"].sum().reset_index()
+
+                # Add total annotations
+                annotations2 = []
+                for i, row in totals2.iterrows():
+                    annotations2.append(
+                        dict(
+                            x=row["Month-Year"],
+                            y=row["Value"] + 13,  # Adjust the position above the bar
+                            text=f"{int(row['Value'])}",
+                            showarrow=False,
+                            font=dict(size=14, family="Arial Bold")
+                        )
+                    )
+
                 bar2.update_layout(
-                    xaxis=dict(
-                        tickformat="%b %Y",  
-                        type="date",  
-                        tickmode="auto",  
-                    )                )
-                
-                bar2.update_xaxes(
-                    tickformat="%b %Y", 
-                    title_text="Year-Month",
-                    tickmode="linear",   
-                    dtick="M1",         
+                    xaxis_tickformat="%b %Y",
+                    annotations=annotations2
                 )
 
 
@@ -853,37 +874,45 @@ def main():
             df2.dropna(subset=["Month-Year"], inplace=True)
 
             df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")
-
             df2.sort_values(by="Month-Year", inplace=True)
+            
             df2_long = df2.melt(
-                id_vars="Month-Year",  
-                value_vars=[col for col in df2.columns if col != "Month-Year"],  
-                var_name="Type", 
+                id_vars="Month-Year",
+                value_vars=[col for col in df2.columns if col != "Month-Year"],
+                var_name="Type",
                 value_name="Value"
             )
-
             df2_long = df2_long[df2_long["Value"] > 0]
-            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')  
+            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')
             fig = px.bar(
                 df2_long,
                 x="Month-Year",
                 y="Value",
-                color="Type", 
-                text="Value", 
+                color="Type",
                 labels={"Month-Year": "Month-Year", "Value": "Count"},
                 height=500,
-                barmode="stack"  
+                barmode="stack"
             )
-
-            fig.update_traces(texttemplate='%{text}', textposition='outside')
-
+            fig.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
+            totals = df2_long.groupby("Month-Year")["Value"].sum().reset_index()
             fig.update_layout(
+                annotations=[
+                    dict(
+                        x=row["Month-Year"],
+                        y=row["Value"]+70,
+                        text=f"{int(row['Value'])}",  
+                        showarrow=False,
+                        font=dict(size=12)
+                    )
+                    for _, row in totals.iterrows()
+                ],
                 xaxis=dict(
-                    type="category",  
-                    tickmode="array",  
-                    tickvals=df2_long["Month-Year"]                ),
+                    type="category",
+                    tickmode="array",
+                    tickvals=df2_long["Month-Year"]
+                ),
                 xaxis_title="Month-Year",
-                xaxis_tickangle=45,  
+                xaxis_tickangle=45,
                 yaxis_title="Count",
                 showlegend=True
             )
@@ -901,80 +930,129 @@ def main():
                     )
         fig_1.update_layout(xaxis_tickformat='%b %Y', xaxis_title='Month-Year', yaxis_title='Min & Sec')
 
-        data_range3 = 'O2:R10'
+        data_range3 = 'O2:Q10'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
-        df.columns.values[0] = "Month Year"  
-
+        df.columns.values[0] = "Month Year"
         df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
-        df[["New Users", "Existing Users", "Total Users"]] = df[["New Users", "Existing Users", "Total Users"]].astype(int)
-        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Users", "Existing Users", "Total Users"],
-                            var_name="User Type", value_name="Count")
+        df[["New Users", "Existing Users"]] = df[["New Users", "Existing Users"]].astype(int)
+
+        df_melted = df.melt(
+            id_vars=["Month-Year"],
+            value_vars=["New Users", "Existing Users"],
+            var_name="User Type",
+            value_name="Count"
+        )
 
         fig_2 = px.bar(
             df_melted,
             x="Month-Year",
             y="Count",
             color="User Type",
-            text="Count",
             labels={"Month-Year": "Month-Year", "Count": "User Count", "User Type": "Category"},
             height=500,
             barmode="stack"
         )
+        fig_2.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
+        totals = df_melted.groupby("Month-Year")["Count"].sum().reset_index()
 
-        fig_2.update_traces(texttemplate='%{text}', textposition='outside')
-        fig_2.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
-                            )
+        fig_2.update_layout(
+            annotations=[
+                dict(
+                    x=row["Month-Year"],
+                    y=row["Count"]+70,
+                    text=f"{int(row['Count'])}",
+                    showarrow=False,
+                    font=dict(size=12)
+                )
+                for _, row in totals.iterrows()
+            ],
+            xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
+            xaxis_title="Month-Year",
+            yaxis_title="User Count",
+            showlegend=True
+        )
 
-        data_range3 = 'O12:R20'
+        data_range3 = 'O12:Q20'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
-        df.columns.values[0] = "Month Year"  
-
+        df.columns.values[0] = "Month Year"
         df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
-        df[["New Teams", "Existing Teams", "Total Teams"]] = df[["New Teams", "Existing Teams", "Total Teams"]].astype(int)
-        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Teams", "Existing Teams", "Total Teams"],
-                            var_name="Teams Type", value_name="Count")
+        df[["New Teams", "Existing Teams"]] = df[["New Teams", "Existing Teams"]].astype(int)
+
+        df_melted = df.melt(
+            id_vars=["Month-Year"],
+            value_vars=["New Teams", "Existing Teams"],
+            var_name="Teams Type",
+            value_name="Count"
+        )
 
         fig_3 = px.bar(
             df_melted,
             x="Month-Year",
             y="Count",
             color="Teams Type",
-            text="Count",
             labels={"Month-Year": "Month-Year", "Count": "Teams Count", "Teams Type": "Category"},
             height=500,
             barmode="stack"
         )
 
-        fig_3.update_traces(texttemplate='%{text}', textposition='outside')
-        fig_3.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
-                            )
+        fig_3.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
+        totals = df_melted.groupby("Month-Year")["Count"].sum().reset_index()
+        fig_3.update_layout(
+            annotations=[
+                dict(
+                    x=row["Month-Year"],
+                    y=row["Count"]+25,
+                    text=f"{int(row['Count'])}",
+                    showarrow=False,
+                    font=dict(size=12)
+                )
+                for _, row in totals.iterrows()
+            ],
+            xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
+            xaxis_title="Month-Year",
+            yaxis_title="Teams Count",
+            showlegend=True
+        )
 
-        data_range3 = 'O22:R30'
+        data_range3 = 'O22:Q30'
         df = worksheet.get_values(data_range3)
         df = pd.DataFrame(df[1:], columns=df[0])
-        df.columns.values[0] = "Month Year"  
-
+        df.columns.values[0] = "Month Year"
         df.rename(columns={"Month Year": "Month-Year"}, inplace=True)
-        df[["New Projects", "Existing Projects", "Total Projects"]] = df[["New Projects", "Existing Projects", "Total Projects"]].astype(int)
-        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Projects", "Existing Projects", "Total Projects"],
+
+        df[["New Projects", "Existing Projects"]] = df[["New Projects", "Existing Projects"]].astype(int)
+        df_melted = df.melt(id_vars=["Month-Year"], value_vars=["New Projects", "Existing Projects"],
                             var_name="Projects Type", value_name="Count")
 
+        df_totals = df.groupby("Month-Year")[["New Projects", "Existing Projects"]].sum().reset_index()
+        df_totals["Total"] = df_totals["New Projects"] + df_totals["Existing Projects"]
         fig_4 = px.bar(
             df_melted,
             x="Month-Year",
             y="Count",
             color="Projects Type",
-            text="Count",
             labels={"Month-Year": "Month-Year", "Count": "Projects Count", "Projects Type": "Category"},
             height=500,
             barmode="stack"
         )
 
-        fig_4.update_traces(texttemplate='%{text}', textposition='outside')
-        fig_4.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]),
-                            )
+        fig_4.update_traces(text="", hovertemplate="<b>%{y}</b>")
+        annotations = []
+        for i, row in df_totals.iterrows():
+            annotations.append(
+                dict(
+                    x=row["Month-Year"], 
+                    y=row["Total"] + 2,  
+                    text=str(row["Total"]), 
+                    showarrow=False,
+                    font=dict(size=14, family="Arial Bold")
+                )
+            )
+
+        fig_4.update_layout(annotations=annotations)
+        fig_4.update_layout(xaxis=dict(type="category", tickmode="array", tickvals=df["Month-Year"]))
 
         col1, col2 = st.columns(2)
 
@@ -1010,6 +1088,7 @@ def main():
         worksheet = sheet.get_worksheet(4)
         data_range2 = 'D1:G20'
         data2 = worksheet.get_values(data_range2)
+
         if data2 and len(data2[0]) >= 2:
             df2 = pd.DataFrame(data2[1:], columns=data2[0])
 
@@ -1023,36 +1102,42 @@ def main():
             df2.dropna(subset=["Month-Year"], inplace=True)
 
             df2["Month-Year"] = pd.to_datetime(df2["Month-Year"], errors="coerce")
-
             df2.sort_values(by="Month-Year", inplace=True)
+
             df2_long = df2.melt(
-                id_vars="Month-Year",  
-                value_vars=[col for col in df2.columns if col != "Month-Year"],  
-                var_name="Type", 
+                id_vars="Month-Year",
+                value_vars=[col for col in df2.columns if col != "Month-Year"],
+                var_name="Type",
                 value_name="Value"
             )
 
             df2_long = df2_long[df2_long["Value"] > 0]
+            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')
 
-            df2_long["Month-Year"] = df2_long["Month-Year"].dt.strftime('%b %Y')  
             fig = px.bar(
                 df2_long,
                 x="Month-Year",
                 y="Value",
-                color="Type", 
-                text="Value", 
+                color="Type",
                 labels={"Month-Year": "Month-Year", "Value": "Office Hours"},
                 height=500,
-                barmode="stack"  
+                barmode="stack"
             )
 
-            fig.update_traces(texttemplate='%{text}', textposition='outside')
-
+            fig.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
+            totals = df2_long.groupby("Month-Year")["Value"].sum().reset_index()
             fig.update_layout(
-                xaxis=dict(
-                    type="category",  
-                    tickmode="array",  
-                    tickvals=df2_long["Month-Year"]                ),
+                annotations=[
+                    dict(
+                        x=row["Month-Year"],
+                        y=row["Value"]+1,
+                        text=f"{int(row['Value'])}",
+                        showarrow=False,
+                        font=dict(size=12)
+                    )
+                    for _, row in totals.iterrows()
+                ],
+                xaxis=dict(type="category", tickmode="array", tickvals=df2_long["Month-Year"].unique()),
                 xaxis_title="Month-Year",
                 yaxis_title="Office Hours",
                 showlegend=True
@@ -1104,27 +1189,58 @@ def main():
         df = fetch_event_participation_member_data()
 
         if df is not None:
-            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y')
-            df_pivot = df.pivot_table(index='month_year_datetime', columns='type', values='count', aggfunc='sum').reset_index()
+            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y', errors='coerce')
+
+            df_pivot = df.pivot_table(
+                index='month_year_datetime',
+                columns='type',
+                values='count',
+                aggfunc='sum'
+            ).reset_index()
+
             df_pivot = df_pivot.dropna(subset=['Host Count', 'Speaker Count', 'Attendee Count'], how='all')
             df_pivot = df_pivot.sort_values('month_year_datetime')
-            sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
-            df_melted = df_pivot.melt(id_vars=['month_year_datetime'], value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
-                              var_name='type', value_name='count')
-            df_melted['count'].fillna(0, inplace=True)
-            fig_1 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
-               labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
-               text='count',
-               height=500)
 
-            fig_1.update_traces(texttemplate='%{y}', textposition='outside')
+            sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
+
+            df_melted = df_pivot.melt(
+                id_vars=['month_year_datetime'],
+                value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
+                var_name='type',
+                value_name='count'
+            )
+
+            df_melted['count'].fillna(0, inplace=True)
+
+            fig_1 = px.bar(
+                df_melted,
+                x='month_year_datetime',
+                y='count',
+                color='type',
+                labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
+                height=500
+            )
+            fig_1.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
+            totals = df_melted.groupby('month_year_datetime')['count'].sum().reset_index()
             fig_1.update_layout(
+                annotations=[
+                    dict(
+                        x=row['month_year_datetime'],
+                        y=row['count'],
+                        text=f"{int(row['count'])}",
+                        showarrow=False,
+                        font=dict(size=12),
+                        xanchor='center',
+                        yanchor='bottom'
+                    )
+                    for _, row in totals.iterrows()
+                ],
                 barmode='stack',
                 xaxis=dict(
-                    type='category',  
-                    tickmode='array',  
-                    tickvals=df_pivot['month_year_datetime'],  
-                    ticktext=sorted_months  
+                    type='category',
+                    tickmode='array',
+                    tickvals=df_pivot['month_year_datetime'],
+                    ticktext=sorted_months
                 ),
                 showlegend=True
             )
@@ -1134,28 +1250,63 @@ def main():
         df = fetch_event_participation_team_data()
 
         if df is not None:
-            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y')
-            df_pivot = df.pivot_table(index='month_year_datetime', columns='type', values='count', aggfunc='sum').reset_index()
+            df['month_year_datetime'] = pd.to_datetime(df['month_year'], format='%b %Y', errors='coerce')
+
+            df_pivot = df.pivot_table(
+                index='month_year_datetime',
+                columns='type',
+                values='count',
+                aggfunc='sum'
+            ).reset_index()
+
             df_pivot = df_pivot.dropna(subset=['Host Count', 'Speaker Count', 'Attendee Count'], how='all')
             df_pivot = df_pivot.sort_values('month_year_datetime')
+
             sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
-            df_melted = df_pivot.melt(id_vars=['month_year_datetime'], value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
-                              var_name='type', value_name='count')
-            fig_2 = px.bar(df_melted, x='month_year_datetime', y='count', color='type',
-               labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
-               text='count',
-               height=500)
-            fig_2.update_traces(texttemplate='%{y}', textposition='outside')
+
+            df_melted = df_pivot.melt(
+                id_vars=['month_year_datetime'],
+                value_vars=['Host Count', 'Speaker Count', 'Attendee Count'],
+                var_name='type',
+                value_name='count'
+            )
+
+            df_melted['count'].fillna(0, inplace=True)
+
+            fig_2 = px.bar(
+                df_melted,
+                x='month_year_datetime',
+                y='count',
+                color='type',
+                labels={'month_year_datetime': 'Month-Year', 'count': 'Count', 'type': 'Type'},
+                height=500
+            )
+
+            totals = df_melted.groupby('month_year_datetime')['count'].sum().reset_index()
             fig_2.update_layout(
+                annotations=[
+                    dict(
+                        x=row['month_year_datetime'],
+                        y=row['count'],
+                        text=f"{int(row['count'])}",
+                        showarrow=False,
+                        font=dict(size=12),
+                        xanchor='center',
+                        yanchor='bottom'
+                    )
+                    for _, row in totals.iterrows()
+                ],
                 barmode='stack',
                 xaxis=dict(
-                    type='category',  
-                    tickmode='array',  
-                    tickvals=df_pivot['month_year_datetime'],  
-                    ticktext=sorted_months  
+                    type='category',
+                    tickmode='array',
+                    tickvals=df_pivot['month_year_datetime'],
+                    ticktext=sorted_months
                 ),
                 showlegend=True
             )
+
+            fig_2.update_traces(texttemplate='', hovertemplate='%{y:.0f}')
         else:
             st.warning("No data available")
 
@@ -1174,33 +1325,43 @@ def main():
 
         df_pivot = df_pivot.dropna(subset=['# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs'], how='all')
         df_pivot = df_pivot.sort_values('month_year_datetime')
+
         sorted_months = df_pivot['month_year_datetime'].dt.strftime('%b %Y')
         df_melted = df_pivot.melt(id_vars=['month_year_datetime'], 
                                 value_vars=['# of hours of blog reading', '# of hours of workshops/problem solving', '# of hours of OHs'],
                                 var_name='type', value_name='hours')
 
-        df_melted['type'] = df_melted['type'].replace({
-            '# of hours of blog reading': 'Blog Reading',
-            '# of hours of workshops/problem solving': 'Workshop',
-            '# of hours of OHs': 'OH'
-        })
-
+        df_melted['hours'] = df_melted['hours'].astype(str)  
+        df_melted['hours'] = df_melted['hours'].str.replace(r'[^\d.]', '', regex=True)  
+        df_melted['hours'] = pd.to_numeric(df_melted['hours'], errors='coerce')
+        df_melted['hours'].fillna(0, inplace=True)
+        df_total = df_melted.groupby('month_year_datetime')['hours'].sum().reset_index()
+        df_total['total'] = df_total['hours']  
+        df_melted = df_melted.merge(df_total[['month_year_datetime', 'total']], on='month_year_datetime', how='left')
         bar2 = px.bar(df_melted, x='month_year_datetime', y='hours', color='type',
                     labels={'month_year_datetime': 'Month-Year', 'hours': 'Hours', 'type': 'Type'},
-                    text='hours',
                     height=500)
-        bar2.update_traces(texttemplate='%{y}', textposition='outside')
+
+        bar2.update_traces(texttemplate='', hovertemplate='%{y:.1f}')
+        totals = df_melted.groupby("month_year_datetime")["hours"].sum().reset_index()
 
         bar2.update_layout(
-            barmode='stack',
-            xaxis=dict(
-                type='category',  
-                tickmode='array',  
-                tickvals=df_pivot['month_year_datetime'],  
-                ticktext=sorted_months  
-            ),
+            annotations=[
+                dict(
+                    x=row["month_year_datetime"],
+                    y=row["hours"]+ 3,
+                    text=f"{row['hours']:.1f}", 
+                    showarrow=False,
+                    font=dict(size=12)
+                )
+                for _, row in totals.iterrows()
+            ],
+            xaxis=dict(type="category", tickmode="array", tickvals=df_melted["month_year_datetime"].unique()),
+            xaxis_title="Month-Year",
+            yaxis_title="Total Hours",
             showlegend=True
         )
+
 
         col1, col2 = st.columns(2)
 
@@ -1277,6 +1438,7 @@ def main():
 
             data_range3 = ranges[2]
             data3 = worksheet.get_values(data_range3)
+
             if data3 and len(data3[0]) >= 2:
                 df3 = pd.DataFrame(data3[1:], columns=data3[0])
 
@@ -1302,23 +1464,34 @@ def main():
                 )
 
                 df3_long = df3_long[df3_long["Value"] > 0]
+                totals = df3_long.groupby("Month-Year")["Value"].sum().reset_index()
 
                 bar3 = px.bar(
                     df3_long,
                     x="Month-Year",
                     y="Value",
-                    text="Value",
-                    color="Type", 
+                    color="Type",
+                    hover_name="Type",
                     labels={"Month-Year": "Month-Year", "Value": "Monthly Talent"},
                     height=500,
-                    barmode="stack"  
+                    barmode="stack"
                 )
-
-                bar3.update_traces(texttemplate='%{text}', textposition='outside') 
-
+                bar3.update_traces(text=None, hovertemplate='%{y:.0f}')
                 bar3.update_layout(
-                    xaxis_tickformat="%b %Y", 
-                    xaxis_tickangle=-45,  
+                    annotations=[
+                        dict(
+                            x=row["Month-Year"],
+                            y=row["Value"] + 10, 
+                            text=f"{int(row['Value'])}",
+                            showarrow=False,
+                            font=dict(size=12),
+                            xanchor="center",
+                            yanchor="bottom"
+                        )
+                        for _, row in totals.iterrows()
+                    ],
+                    xaxis_tickformat="%b %Y",
+                    xaxis_tickangle=360,
                     xaxis_title="Month-Year",
                     yaxis_title="Monthly Talent",
                     legend_title="Team Level",
