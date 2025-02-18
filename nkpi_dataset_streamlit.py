@@ -425,6 +425,31 @@ def process_and_plot(data_range, worksheet, x_col, y_col, y_label):
 def main():
     st.set_page_config(page_title="nKPI Dashboard", layout="wide")
 
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+
+    if not st.session_state.logged_in:
+        st.sidebar.title("nKPI Dashboard Login")
+        username_input = st.sidebar.text_input("Username", key="username_input")
+        password_input = st.sidebar.text_input("Password", type="password", key="password_input")
+
+        if st.sidebar.button("Login"):
+            if authenticate(username_input, password_input):
+                st.session_state.logged_in = True
+                st.session_state.username = username_input  
+                st.sidebar.success("✅ Login Successful!")
+                st.rerun()
+            else:
+                st.sidebar.error("Invalid Username or Password")
+        return  
+
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
+
     page = st.sidebar.radio(
         "nKPI Dashboard",
         [
@@ -1829,7 +1854,13 @@ def main():
     elif page == 'User/Customers':
         st.subheader("")
 
+USER_CREDENTIALS = {
+    os.getenv("NKPI_USERNAME"): os.getenv("NKPI_PASSWORD")
+}
+
+def authenticate(username, password):
+    """Authenticate user based on direct password comparison."""
+    return USER_CREDENTIALS.get(username) == password
+
 if __name__ == "__main__":
     main()
-
-   
